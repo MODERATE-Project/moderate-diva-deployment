@@ -1,0 +1,179 @@
+version: "3"
+
+vars:
+  GIT_URL_ANSIBLE_CONFIGURATOR: git@gitlab.linksfoundation.com:csc/csc-projects/moderate/ansible-configurator.git
+  ANSIBLE_CONFIGURATOR_DIR: ansible-configurator
+  LINKS_IMAGE_REGISTRY: gitlab.linksfoundation.com:5050
+  CERT_DIR: certificates
+  CA_KEY: "{{.ROOT_DIR}}/{{.CERT_DIR}}/ca.key"
+  CA_CRT: "{{.ROOT_DIR}}/{{.CERT_DIR}}/ca.crt"
+  CA_PEM: "{{.ROOT_DIR}}/{{.CERT_DIR}}/ca.pem"
+  CA_DER: "{{.ROOT_DIR}}/{{.CERT_DIR}}/ca.der"
+  SERVER_KEY: "{{.ROOT_DIR}}/{{.CERT_DIR}}/server.key"
+  SERVER_CSR: "{{.ROOT_DIR}}/{{.CERT_DIR}}/server.csr"
+  SERVER_CRT: "{{.ROOT_DIR}}/{{.CERT_DIR}}/server.crt"
+  KEYSTORE_JKS: "{{.ROOT_DIR}}/{{.CERT_DIR}}/keystore.jks"
+  TRUSTSTORE_JKS: "{{.ROOT_DIR}}/{{.CERT_DIR}}/truststore.jks"
+  KEYSTORE_P12: "{{.ROOT_DIR}}/{{.CERT_DIR}}/keystore.p12"
+
+dotenv:
+  - .env.default
+
+tasks:
+  clone-ansible-configurator:
+    desc: Clone the ansible-configurator repository
+    cmds:
+      - git clone {{.GIT_URL_ANSIBLE_CONFIGURATOR}} {{.ANSIBLE_CONFIGURATOR_DIR}}
+    status:
+      - test -d {{.ANSIBLE_CONFIGURATOR_DIR}}
+
+  clone:
+    desc: Clone the repositories
+    cmds:
+      - task: clone-ansible-configurator
+
+  login-registry:
+    desc: Login to the registry
+    cmds:
+      - docker login {{.LINKS_IMAGE_REGISTRY}}
+
+  create-cert-dir:
+    desc: Create certificates directory
+    cmds:
+      - mkdir -p {{.CERT_DIR}}
+    status:
+      - test -d {{.CERT_DIR}}
+
+  generate-ca-key:
+    desc: Generate CA private key
+    deps: [create-cert-dir]
+    cmds:
+      - openssl genrsa -out {{.CA_KEY}} 4096
+    status:
+      - test -f {{.CA_KEY}}
+
+  generate-ca-cert:
+    desc: Generate CA certificate
+    deps: [generate-ca-key]
+    cmds:
+      - openssl req -new -x509 -days 3650 -key {{.CA_KEY}} -out {{.CA_CRT}} -subj "{{.CA_SUBJECT}}"
+    status:
+      - test -f {{.CA_CRT}}
+
+  generate-ca-pem:
+    desc: Generate CA certificate in PEM format
+    deps: [generate-ca-cert]
+    cmds:
+      - cp {{.CA_CRT}} {{.CA_PEM}}
+    status:
+      - test -f {{.CA_PEM}}
+
+  generate-ca-der:
+    desc: Generate CA certificate in DER format
+    deps: [generate-ca-cert]
+    cmds:
+      - openssl x509 -in {{.CA_CRT}} -outform DER -out {{.CA_DER}}
+    status:
+      - test -f {{.CA_DER}}
+
+  generate-server-key:
+    desc: Generate server private key
+    deps: [create-cert-dir]
+    cmds:
+      - openssl genrsa -out {{.SERVER_KEY}} 4096
+    status:
+      - test -f {{.SERVER_KEY}}
+
+  generate-server-csr:
+    desc: Generate server certificate signing request
+    deps: [generate-server-key]
+    cmds:
+      - openssl req -new -key {{.SERVER_KEY}} -out {{.SERVER_CSR}} -subj "{{.SERVER_SUBJECT}}"
+    status:
+      - test -f {{.SERVER_CSR}}
+
+  generate-server-cert:
+    desc: Generate signed server certificate
+    deps: [generate-server-csr, generate-ca-cert]
+    cmds:
+      - openssl x509 -req -in {{.SERVER_CSR}} -CA {{.CA_CRT}} -CAkey {{.CA_KEY}} -CAcreateserial -out {{.SERVER_CRT}} -days 365
+    status:
+      - test -f {{.SERVER_CRT}}
+
+  generate-pkcs12-keystore:
+    desc: Generate PKCS12 keystore from server certificate and key
+    deps: [generate-server-cert]
+    cmds:
+      - openssl pkcs12 -export -in {{.SERVER_CRT}} -inkey {{.SERVER_KEY}} -out {{.KEYSTORE_P12}} -name server -password pass:{{.KEYSTORE_PASSWORD}}
+    status:
+      - test -f {{.KEYSTORE_P12}}
+
+  generate-java-keystore:
+    desc: Convert PKCS12 keystore to Java keystore format
+    deps: [generate-pkcs12-keystore]
+    cmds:
+      - keytool -importkeystore -srckeystore {{.KEYSTORE_P12}} -srcstoretype PKCS12 -destkeystore {{.KEYSTORE_JKS}} -deststoretype JKS -srcstorepass {{.KEYSTORE_PASSWORD}} -deststorepass {{.KEYSTORE_PASSWORD}} -noprompt
+    status:
+      - test -f {{.KEYSTORE_JKS}}
+
+  generate-java-truststore:
+    desc: Generate Java truststore with CA certificate
+    deps: [generate-ca-cert]
+    cmds:
+      - keytool -import -trustcacerts -alias ca -file {{.CA_CRT}} -keystore {{.TRUSTSTORE_JKS}} -storepass {{.KEYSTORE_PASSWORD}} -noprompt
+    status:
+      - test -f {{.TRUSTSTORE_JKS}}
+
+  generate-certificates:
+    desc: Generate all required certificates and keystores
+    cmds:
+      - task: generate-ca-key
+      - task: generate-ca-cert
+      - task: generate-ca-pem
+      - task: generate-ca-der
+      - task: generate-server-key
+      - task: generate-server-csr
+      - task: generate-server-cert
+      - task: generate-java-keystore
+      - task: generate-java-truststore
+
+  clean-certificates:
+    desc: Remove all generated certificates and keystores
+    cmds:
+      - rm -rf {{.CERT_DIR}}
+
+  verify-certificates:
+    desc: Verify the generated certificates
+    silent: true
+    deps: [generate-certificates]
+    cmds:
+      - echo "╔════════════════════════════════════════════════════════════╗"
+      - echo "║                    CA Certificate Details                  ║"
+      - echo "╚════════════════════════════════════════════════════════════╝"
+      - openssl x509 -in {{.CA_CRT}} -text -noout
+      - echo ""
+      - echo "╔════════════════════════════════════════════════════════════╗"
+      - echo "║                  Server Certificate Details                ║"
+      - echo "╚════════════════════════════════════════════════════════════╝"
+      - openssl x509 -in {{.SERVER_CRT}} -text -noout
+      - echo ""
+      - echo "╔════════════════════════════════════════════════════════════╗"
+      - echo "║           Verifying Server Certificate against CA          ║"
+      - echo "╚════════════════════════════════════════════════════════════╝"
+      - openssl verify -CAfile {{.CA_CRT}} {{.SERVER_CRT}}
+      - echo ""
+      - echo "╔════════════════════════════════════════════════════════════╗"
+      - echo "║                  Java Keystore Contents                    ║"
+      - echo "╚════════════════════════════════════════════════════════════╝"
+      - keytool -list -keystore {{.KEYSTORE_JKS}} -storepass {{.KEYSTORE_PASSWORD}}
+      - echo ""
+      - echo "╔════════════════════════════════════════════════════════════╗"
+      - echo "║                 Java Truststore Contents                   ║"
+      - echo "╚════════════════════════════════════════════════════════════╝"
+      - keytool -list -keystore {{.TRUSTSTORE_JKS}} -storepass {{.KEYSTORE_PASSWORD}}
+
+  clean:
+    desc: Clean the certificates directory
+    cmds:
+      - rm -rf {{.ANSIBLE_CONFIGURATOR_DIR}}
+      - task: clean-certificates
