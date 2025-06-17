@@ -4,6 +4,7 @@ vars:
   GIT_URL_ANSIBLE_CONFIGURATOR: git@gitlab.linksfoundation.com:csc/csc-projects/moderate/ansible-configurator.git
   ANSIBLE_CONFIGURATOR_DIR: ansible-configurator
   LINKS_IMAGE_REGISTRY: gitlab.linksfoundation.com:5050
+  CONFIG_DIR: config
   CERT_DIR: certificates
   CA_KEY: "{{.ROOT_DIR}}/{{.CERT_DIR}}/ca.key"
   CA_CRT: "{{.ROOT_DIR}}/{{.CERT_DIR}}/ca.crt"
@@ -17,9 +18,27 @@ vars:
   KEYSTORE_P12: "{{.ROOT_DIR}}/{{.CERT_DIR}}/keystore.p12"
 
 dotenv:
+  - .env
   - .env.default
 
 tasks:
+  check-dependencies:
+    desc: Verify required dependencies are installed
+    cmds:
+      - docker --version
+      - docker compose version || docker-compose --version
+      - ansible --version
+      - python3 --version || python --version
+      - python3 -c "import jinja2" || exit 1
+      - envsubst --help > /dev/null
+
+  setup:
+    desc: Setup the environment
+    deps: [check-dependencies]
+    cmds:
+      - task: clone
+      - task: login-registry
+
   clone-ansible-configurator:
     desc: Clone the ansible-configurator repository
     cmds:
@@ -141,6 +160,37 @@ tasks:
     desc: Remove all generated certificates and keystores
     cmds:
       - rm -rf {{.CERT_DIR}}
+
+  configure-ansible:
+    desc: Configure ansible playbooks
+    deps: [clone-ansible-configurator]
+    cmds:
+      - envsubst < {{.CONFIG_DIR}}/general.params.yml.tpl > {{.ANSIBLE_CONFIGURATOR_DIR}}/params.yml
+      - envsubst < {{.CONFIG_DIR}}/keycloak.params.yml.tpl > {{.ANSIBLE_CONFIGURATOR_DIR}}/Keycloak/params.yml
+      - envsubst < {{.CONFIG_DIR}}/kafka.params.yml.tpl > {{.ANSIBLE_CONFIGURATOR_DIR}}/Kafka/params.yml
+      - envsubst < {{.CONFIG_DIR}}/nifi.params.yml.tpl > {{.ANSIBLE_CONFIGURATOR_DIR}}/NiFi/params.yml
+      - envsubst < {{.CONFIG_DIR}}/nifi_processors.params.yml.tpl > {{.ANSIBLE_CONFIGURATOR_DIR}}/NiFi_Processors/params.yml
+      - envsubst < {{.CONFIG_DIR}}/quality_reporter.params.yml.tpl > {{.ANSIBLE_CONFIGURATOR_DIR}}/Quality_Reporter/params.yml
+
+  deploy:
+    desc: Deploy the full infrastructure
+    deps: [configure-ansible]
+    dir: "{{.ANSIBLE_CONFIGURATOR_DIR}}"
+    cmds:
+      - ansible-playbook -K ansible-plb.yml
+
+  down:
+    desc: Stop and remove all services
+    dir: "{{.ANSIBLE_CONFIGURATOR_DIR}}"
+    cmds:
+      - ansible-playbook -K ansible-plb.yml --tags never
+
+  diva:
+    desc: "Setup, configure and deploy the Data Integrity and Validation infrastructure"
+    cmds:
+      - task: setup
+      - task: configure-ansible
+      - task: deploy
 
   verify-certificates:
     desc: Verify the generated certificates
