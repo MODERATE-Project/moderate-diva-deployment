@@ -91,16 +91,6 @@ tasks:
     status:
       - test -d {{.ROOT_DIR}}/{{.CERT_DIR}}
 
-  generate-certificates:
-    desc: "Generate SSL certificates using Let's Encrypt"
-    deps:
-      - create-cert-dir
-      - validate-config
-    cmds:
-      - task: run-certbot
-      - task: convert-letsencrypt-to-java-stores
-      - task: setup-letsencrypt-truststore
-
   run-certbot:
     desc: "Obtain SSL certificates from Let's Encrypt using certbot"
     deps:
@@ -121,8 +111,6 @@ tasks:
       - cp {{.ROOT_DIR}}/{{.CERT_DIR}}/live/{{.MACHINE_URL}}/privkey.pem {{.SERVER_KEY}}
       - cp {{.ROOT_DIR}}/{{.CERT_DIR}}/live/{{.MACHINE_URL}}/fullchain.pem {{.SERVER_CRT}}
       - task: chown-certs
-    status:
-      - test -f {{.SERVER_KEY}} && test -f {{.SERVER_CRT}}
 
   convert-letsencrypt-to-java-stores:
     desc: "Convert Let's Encrypt certificates to Java keystore format"
@@ -143,8 +131,6 @@ tasks:
         -srcstorepass {{.GENERIC_PSW}}
         -deststorepass {{.GENERIC_PSW}}
         -noprompt
-    status:
-      - test -f {{.KEYSTORE_JKS}}
     preconditions:
       - test -f {{.SERVER_KEY}} && test -f {{.SERVER_CRT}}
 
@@ -167,19 +153,6 @@ tasks:
         -storepass {{.GENERIC_PSW}} -noprompt
     status:
       - test -f {{.TRUSTSTORE_JKS}}
-
-  renew-certificates:
-    desc: "Renew existing Let's Encrypt certificates"
-    cmds:
-      - >
-        docker run --rm
-        -v {{.ROOT_DIR}}/{{.CERT_DIR}}:/etc/letsencrypt
-        -v {{.ROOT_DIR}}/{{.CERT_DIR}}/webroot:/var/www/certbot
-        certbot/certbot renew
-        --non-interactive
-      - cp {{.ROOT_DIR}}/{{.CERT_DIR}}/live/{{.MACHINE_URL}}/privkey.pem {{.SERVER_KEY}}
-      - cp {{.ROOT_DIR}}/{{.CERT_DIR}}/live/{{.MACHINE_URL}}/fullchain.pem {{.SERVER_CRT}}
-      - task: convert-letsencrypt-to-java-stores
 
   verify-certificates:
     desc: "Verify that SSL certificates are valid and display their details"
