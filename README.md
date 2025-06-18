@@ -7,6 +7,6 @@ This repository contains deployment configurations and automation scripts for th
 > [!IMPORTANT]
 > There is a **manual step** required while Ansible is executing the playbook.
 > 
-> When it's time to create the OAuth clients in Keycloak, after you have created them and updated the `.env` file, you must run the task `task configure-ansible` in a separate session.
+> When it's time to create the OAuth clients in Keycloak, after you have created them and updated the `.env` file, you must run the task `task process-configuration-templates` in a separate session.
 > 
 > Do this before confirming the prompt related to the OAuth clients: `After Keycloak deployment, you have to manually create a client for NiFi [...]`.

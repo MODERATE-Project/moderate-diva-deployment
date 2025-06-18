@@ -17,6 +17,8 @@ vars:
   KEYSTORE_JKS: "{{.ROOT_DIR}}/{{.CERT_DIR}}/keystore.jks"
   TRUSTSTORE_JKS: "{{.ROOT_DIR}}/{{.CERT_DIR}}/truststore.jks"
   KEYSTORE_P12: "{{.ROOT_DIR}}/{{.CERT_DIR}}/keystore.p12"
+  LETSENCRYPT_X1_URL: "https://letsencrypt.org/certs/isrgrootx1.pem"
+  LETSENCRYPT_R3_URL: "https://letsencrypt.org/certs/lets-encrypt-r3.pem"
 
 dotenv:
   - .env
@@ -136,10 +138,8 @@ tasks:
     deps:
       - create-cert-dir
     cmds:
-      - |
-        # Download Let's Encrypt root and intermediate certificates
-        curl -s https://letsencrypt.org/certs/isrgrootx1.pem -o {{.ROOT_DIR}}/{{.CERT_DIR}}/isrgrootx1.pem
-        curl -s https://letsencrypt.org/certs/lets-encrypt-r3.pem -o {{.ROOT_DIR}}/{{.CERT_DIR}}/lets-encrypt-r3.pem
+      - curl -s {{.LETSENCRYPT_X1_URL}} -o {{.ROOT_DIR}}/{{.CERT_DIR}}/isrgrootx1.pem
+      - curl -s {{.LETSENCRYPT_R3_URL}} -o {{.ROOT_DIR}}/{{.CERT_DIR}}/lets-encrypt-r3.pem
       - >
         keytool -import -trustcacerts -alias letsencrypt-root
         -file {{.ROOT_DIR}}/{{.CERT_DIR}}/isrgrootx1.pem
@@ -179,8 +179,8 @@ tasks:
       - ./scripts/verify-certificates.sh
 
   # Configuration & Deployment
-  configure-ansible:
-    desc: "Generate Ansible configuration files from templates"
+  process-configuration-templates:
+    desc: "Substitute placeholders in templates with environment variables and move them to the correct directory"
     deps:
       - clone-ansible-configurator
       - validate-config
@@ -195,7 +195,7 @@ tasks:
   deploy:
     desc: "Deploy the complete DIVA infrastructure using Ansible"
     deps:
-      - configure-ansible
+      - process-configuration-templates
     dir: "{{.ANSIBLE_CONFIGURATOR_DIR}}"
     cmds:
       - ansible-playbook -K ansible-plb.yml
@@ -212,7 +212,7 @@ tasks:
     deps:
       - validate-config
     cmds:
-      - task: configure-ansible
+      - task: process-configuration-templates
       - task: deploy
 
   # Main Deployment Task
@@ -224,7 +224,7 @@ tasks:
       - task: setup
       - task: generate-certificates
       - task: verify-certificates
-      - task: configure-ansible
+      - task: process-configuration-templates
       - task: deploy
 
   # Cleanup Tasks
