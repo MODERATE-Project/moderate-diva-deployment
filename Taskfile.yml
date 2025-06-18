@@ -65,9 +65,12 @@ tasks:
       - task: login-registry
 
   clone-ansible-configurator:
-    desc: "Clone the ansible-configurator repository"
+    desc: "Clone the ansible-configurator repository and apply NiFi fix"
     cmds:
-      - git clone {{.GIT_URL_ANSIBLE_CONFIGURATOR}} {{.ANSIBLE_CONFIGURATOR_DIR}}
+      - git clone {{.GIT_URL_ANSIBLE_CONFIGURATOR}} {{.ROOT_DIR}}/{{.ANSIBLE_CONFIGURATOR_DIR}}
+      - >
+        cp {{.ROOT_DIR}}/overrides/nifi-ansible-plb.yml
+        {{.ROOT_DIR}}/{{.ANSIBLE_CONFIGURATOR_DIR}}/NiFi/ansible-plb.yml
     status:
       - test -d {{.ANSIBLE_CONFIGURATOR_DIR}}
 
