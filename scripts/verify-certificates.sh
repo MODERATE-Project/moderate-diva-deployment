@@ -23,7 +23,6 @@ WARNING_SYMBOL="⚠️"
 
 # Required environment variables
 REQUIRED_VARS=(
-    "CA_CRT"
     "SERVER_CRT"
     "KEYSTORE_JKS"
     "TRUSTSTORE_JKS"
@@ -111,10 +110,6 @@ check_required_tools() {
 validate_certificate_files() {
     local missing_files=()
 
-    if [ ! -f "$CA_CRT" ]; then
-        missing_files+=("CA Certificate: $CA_CRT")
-    fi
-
     if [ ! -f "$SERVER_CRT" ]; then
         missing_files+=("Server Certificate: $SERVER_CRT")
     fi
@@ -140,33 +135,11 @@ validate_certificate_files() {
 # Certificate Display Functions
 # -----------------------------------------------------------------------------
 
-# Display CA certificate details
-display_ca_certificate() {
-    print_section_header "CA Certificate Details"
-    if ! openssl x509 -in "$CA_CRT" -text -noout; then
-        print_error "Failed to read CA certificate from $CA_CRT"
-    fi
-    echo ""
-}
-
 # Display server certificate details
 display_server_certificate() {
     print_section_header "Server Certificate Details"
     if ! openssl x509 -in "$SERVER_CRT" -text -noout; then
         print_error "Failed to read server certificate from $SERVER_CRT"
-    fi
-    echo ""
-}
-
-# Verify server certificate against CA
-verify_certificate_chain() {
-    print_section_header "Verifying Server Certificate against CA"
-    if openssl verify -CAfile "$CA_CRT" "$SERVER_CRT"; then
-        print_success "Certificate chain verification passed"
-    else
-        print_error "Certificate chain verification failed!" \
-            "The server certificate is not properly signed by the CA." \
-            "Please regenerate the certificates using 'task generate-certificates'."
     fi
     echo ""
 }
@@ -195,9 +168,7 @@ display_truststore_contents() {
 
 # Run all certificate verification checks
 run_certificate_verification() {
-    display_ca_certificate
     display_server_certificate
-    verify_certificate_chain
     display_keystore_contents
     display_truststore_contents
 }

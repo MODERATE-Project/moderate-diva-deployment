@@ -25,13 +25,25 @@ dotenv:
   - .env.default
 
 tasks:
-  # Configuration Validation
+  check-sudo:
+    cmds:
+      - >
+        if [ "$(id -u)" != "0" ]; then
+          echo "This task must be run as root. Please use sudo."
+          exit 1
+        fi
+
+  chown-certs:
+    deps:
+      - check-sudo
+    cmds:
+      - chown -R $(logname):$(id -gn $(logname)) {{.ROOT_DIR}}/{{.CERT_DIR}}
+
   validate-config:
     desc: "Check that all required environment variables are set"
     cmds:
       - ./scripts/validate-config.sh
 
-  # System Requirements & Dependencies
   check-dependencies:
     desc: "Verify that Docker, Ansible, Python and other required tools are installed"
     deps:
@@ -41,16 +53,16 @@ tasks:
       - docker compose version
       - python3 --version
       - ansible --version
-      - envsubst --help > /dev/null
+      - envsubst --help
+      - keytool --help
 
-  # Environment Setup
   setup:
     desc: "Set up the deployment environment by cloning repositories and logging into registry"
     deps:
       - check-dependencies
     cmds:
-      - clone
-      - login-registry
+      - task: clone
+      - task: login-registry
 
   clone-ansible-configurator:
     desc: "Clone the ansible-configurator repository"
@@ -69,15 +81,13 @@ tasks:
     cmds:
       - docker login {{.IMAGE_REGISTRY_URL}}
 
-  # Certificate Management
   create-cert-dir:
     desc: "Create the certificates directory"
     cmds:
-      - mkdir -p {{.CERT_DIR}}
+      - mkdir -p {{.ROOT_DIR}}/{{.CERT_DIR}}
     status:
-      - test -d {{.CERT_DIR}}
+      - test -d {{.ROOT_DIR}}/{{.CERT_DIR}}
 
-  # Let's Encrypt Certificate Tasks
   generate-certificates:
     desc: "Generate SSL certificates using Let's Encrypt"
     deps:
@@ -92,6 +102,7 @@ tasks:
     desc: "Obtain SSL certificates from Let's Encrypt using certbot"
     deps:
       - create-cert-dir
+      - check-sudo
     cmds:
       - >
         docker run --rm
@@ -106,13 +117,12 @@ tasks:
         -d {{.MACHINE_URL}}
       - cp {{.ROOT_DIR}}/{{.CERT_DIR}}/live/{{.MACHINE_URL}}/privkey.pem {{.SERVER_KEY}}
       - cp {{.ROOT_DIR}}/{{.CERT_DIR}}/live/{{.MACHINE_URL}}/fullchain.pem {{.SERVER_CRT}}
+      - task: chown-certs
     status:
       - test -f {{.SERVER_KEY}} && test -f {{.SERVER_CRT}}
 
   convert-letsencrypt-to-java-stores:
     desc: "Convert Let's Encrypt certificates to Java keystore format"
-    deps:
-      - run-certbot
     cmds:
       - >
         openssl pkcs12 -export
@@ -132,6 +142,8 @@ tasks:
         -noprompt
     status:
       - test -f {{.KEYSTORE_JKS}}
+    preconditions:
+      - test -f {{.SERVER_KEY}} && test -f {{.SERVER_CRT}}
 
   setup-letsencrypt-truststore:
     desc: "Create Java truststore with Let's Encrypt root certificates"
@@ -168,8 +180,6 @@ tasks:
 
   verify-certificates:
     desc: "Verify that SSL certificates are valid and display their details"
-    deps:
-      - generate-certificates
     env:
       SERVER_CRT: "{{.SERVER_CRT}}"
       KEYSTORE_JKS: "{{.KEYSTORE_JKS}}"
@@ -178,7 +188,6 @@ tasks:
     cmds:
       - ./scripts/verify-certificates.sh
 
-  # Configuration & Deployment
   process-configuration-templates:
     desc: "Substitute placeholders in templates with environment variables and move them to the correct directory"
     deps:
@@ -206,32 +215,16 @@ tasks:
     cmds:
       - ansible-playbook -K ansible-plb.yml --tags never
 
-  # OAuth Configuration Update
-  update-oauth:
-    desc: "Update OAuth client secrets and redeploy services"
-    deps:
-      - validate-config
-    cmds:
-      - task: process-configuration-templates
-      - task: deploy
-
-  # Main Deployment Task
   diva:
     desc: "Deploy DIVA with Let's Encrypt certificates (complete setup)"
     deps:
       - validate-config
     cmds:
-      - task: setup
-      - task: generate-certificates
       - task: verify-certificates
       - task: process-configuration-templates
       - task: deploy
-
-  # Cleanup Tasks
-  clean-certificates:
-    desc: "Remove all generated SSL certificates and keystores"
-    cmds:
-      - rm -rf {{.CERT_DIR}}
+    preconditions:
+      - test -d {{.ROOT_DIR}}/{{.ANSIBLE_CONFIGURATOR_DIR}}
 
   clean:
     desc: "Remove all generated files and cloned repositories"
@@ -240,4 +233,4 @@ tasks:
       - rm -rf {{.ROOT_DIR}}/{{.KAFKA_SETUP_DIR}}
       - rm -rf {{.ROOT_DIR}}/{{.KEYCLOAK_SETUP_DIR}}
       - rm -rf {{.ROOT_DIR}}/{{.NIFI_SETUP_DIR}}
-      - task: clean-certificates
+      - rm -rf {{.ROOT_DIR}}/{{.CERT_DIR}}
