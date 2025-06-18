@@ -95,45 +95,34 @@ load_env_variables() {
 # Validation Functions
 # -----------------------------------------------------------------------------
 
-# Validate AUTH_KEY is set and not a placeholder
+# Validate AUTH_KEY is a path to a valid SSH private key file
 validate_auth_key() {
-    if [ -z "$AUTH_KEY" ] || echo "$AUTH_KEY" | grep -q "REPLACE_WITH_YOUR_FULL_SSH_KEY\|AAAAB3NzaC1yc2EAAAADAQABAAACAQC\.\.\."; then
-        print_error "AUTH_KEY is not properly configured!" \
-            "The AUTH_KEY variable contains a placeholder value." \
-            "Please replace it with your actual SSH public key for GitLab access." \
-            "" \
-            "This SSH key must have access to the following GitLab repositories:" \
-            "- ansible-configurator.git" \
-            "- kafka.git" \
-            "- keycloak.git" \
-            "- nifi.git" \
-            "- data-quality-reporter.git (cloned during deployment)" \
-            "" \
-            "Current value: $AUTH_KEY" \
-            "" \
-            "Supported key formats:" \
-            "- RSA: ssh-rsa AAAAB3NzaC1yc2E... your-email@domain.com" \
-            "- Ed25519: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5... your-email@domain.com" \
-            "" \
-            "Steps to fix:" \
-            "1. Generate an SSH key pair:" \
-            "   - RSA: ssh-keygen -t rsa -b 4096 -C 'your-email@domain.com'" \
-            "   - Ed25519 (recommended): ssh-keygen -t ed25519 -C 'your-email@domain.com'" \
-            "2. Add the public key to your GitLab account" \
-            "3. Copy the COMPLETE public key content to AUTH_KEY in .env"
+    # Check if AUTH_KEY is set
+    if [ -z "$AUTH_KEY" ]; then
+        print_error "AUTH_KEY is not configured!" \
+            "Please set AUTH_KEY in your .env file to the path of your SSH private key." \
+            "Example: AUTH_KEY=~/.ssh/id_ed25519"
     fi
-}
 
-# Validate AUTH_KEY format appears to be a valid SSH key
-validate_auth_key_format() {
-    if ! echo "$AUTH_KEY" | grep -q "^ssh-rsa AAAAB3NzaC1yc2E\|^ssh-ed25519 AAAAC3NzaC1lZDI1NTE5"; then
-        print_error "AUTH_KEY does not appear to be a valid SSH public key!" \
-            "Please ensure AUTH_KEY is a complete SSH public key." \
-            "Supported formats:" \
-            "- RSA: ssh-rsa AAAAB3NzaC1yc2E... your-email@domain.com" \
-            "- Ed25519: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5... your-email@domain.com" \
+    # Check if the key path points to a public key
+    if [[ "$AUTH_KEY" == *.pub ]]; then
+        print_error "AUTH_KEY is pointing to a public key file (.pub)!" \
+            "Please set AUTH_KEY to the path of your PRIVATE key." \
+            "The private key for '$AUTH_KEY' would typically be '${AUTH_KEY%.pub}'." \
+            "Current value: '$AUTH_KEY'"
+    fi
+
+    # Expand tilde to home directory
+    local key_path="${AUTH_KEY/#\~/$HOME}"
+
+    # Check if file exists
+    if [ ! -f "$key_path" ]; then
+        print_error "AUTH_KEY file not found!" \
+            "The SSH private key file specified in AUTH_KEY does not exist at this path: '$key_path'." \
+            "Current AUTH_KEY value: '$AUTH_KEY'" \
             "" \
-            "Current value: $AUTH_KEY"
+            "Please ensure the path is correct and the file exists." \
+            "If you don't have an SSH key, you can generate one using: ssh-keygen -t ed25519"
     fi
 }
 
@@ -162,7 +151,6 @@ check_localhost_warning() {
 # Run all configuration validation checks
 run_validations() {
     validate_auth_key
-    validate_auth_key_format
     validate_required_variable "MACHINE_URL" "$MACHINE_URL" "the hostname or IP where services will be accessible"
     validate_required_variable "PROJECT_NAME" "$PROJECT_NAME" "a unique identifier for this deployment"
     validate_required_variable "DIGITAL_TWIN_FOLDER" "$DIGITAL_TWIN_FOLDER" "the base directory for DIVA components"
