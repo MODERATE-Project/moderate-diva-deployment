@@ -163,7 +163,7 @@ tasks:
     desc: "Create PKCS12 keystore - Bundles server certificate and key for Java applications"
     deps: [generate-server-cert]
     cmds:
-      - openssl pkcs12 -export -in {{.SERVER_CRT}} -inkey {{.SERVER_KEY}} -out {{.KEYSTORE_P12}} -name server -password pass:{{.KEYSTORE_PASSWORD}}
+      - openssl pkcs12 -export -in {{.SERVER_CRT}} -inkey {{.SERVER_KEY}} -out {{.KEYSTORE_P12}} -name server -password pass:{{.GENERIC_PSW}}
     status:
       - test -f {{.KEYSTORE_P12}}
 
@@ -174,8 +174,8 @@ tasks:
       - >
         keytool -importkeystore -srckeystore {{.KEYSTORE_P12}}
         -srcstoretype PKCS12 -destkeystore {{.KEYSTORE_JKS}}
-        -deststoretype JKS -srcstorepass {{.KEYSTORE_PASSWORD}}
-        -deststorepass {{.KEYSTORE_PASSWORD}} -noprompt
+        -deststoretype JKS -srcstorepass {{.GENERIC_PSW}}
+        -deststorepass {{.GENERIC_PSW}} -noprompt
     status:
       - test -f {{.KEYSTORE_JKS}}
 
@@ -183,7 +183,7 @@ tasks:
     desc: "Create Java truststore - Stores CA certificate for Java applications to trust connections"
     deps: [generate-ca-cert]
     cmds:
-      - keytool -import -trustcacerts -alias ca -file {{.CA_CRT}} -keystore {{.TRUSTSTORE_JKS}} -storepass {{.KEYSTORE_PASSWORD}} -noprompt
+      - keytool -import -trustcacerts -alias ca -file {{.CA_CRT}} -keystore {{.TRUSTSTORE_JKS}} -storepass {{.GENERIC_PSW}} -noprompt
     status:
       - test -f {{.TRUSTSTORE_JKS}}
 
@@ -209,7 +209,7 @@ tasks:
       SERVER_CRT: "{{.SERVER_CRT}}"
       KEYSTORE_JKS: "{{.KEYSTORE_JKS}}"
       TRUSTSTORE_JKS: "{{.TRUSTSTORE_JKS}}"
-      KEYSTORE_PASSWORD: "{{.KEYSTORE_PASSWORD}}"
+      KEYSTORE_PASSWORD: "{{.GENERIC_PSW}}"
     cmds:
       - ./scripts/verify-certificates.sh
 
