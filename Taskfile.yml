@@ -79,6 +79,93 @@ tasks:
     status:
       - test -d {{.CERT_DIR}}
 
+  # Let's Encrypt Certificate Tasks
+  generate-letsencrypt-certificates:
+    desc: "Generate Let's Encrypt SSL certificates - Uses certbot in Docker for trusted certificates"
+    deps: [create-cert-dir, validate-config]
+    cmds:
+      - task: run-certbot
+      - task: convert-letsencrypt-to-java-stores
+      - task: setup-letsencrypt-truststore
+
+  run-certbot:
+    desc: "Run certbot to obtain Let's Encrypt certificates"
+    deps: [create-cert-dir]
+    cmds:
+      - |
+        docker run --rm \
+          -v {{.ROOT_DIR}}/{{.CERT_DIR}}:/etc/letsencrypt \
+          -v {{.ROOT_DIR}}/{{.CERT_DIR}}/webroot:/var/www/certbot \
+          -p 80:80 \
+          certbot/certbot certonly \
+          --standalone \
+          --non-interactive \
+          --agree-tos \
+          --email {{.LETSENCRYPT_EMAIL}} \
+          -d {{.MACHINE_URL}}
+      - cp {{.ROOT_DIR}}/{{.CERT_DIR}}/live/{{.MACHINE_URL}}/privkey.pem {{.SERVER_KEY}}
+      - cp {{.ROOT_DIR}}/{{.CERT_DIR}}/live/{{.MACHINE_URL}}/fullchain.pem {{.SERVER_CRT}}
+    status:
+      - test -f {{.SERVER_KEY}} && test -f {{.SERVER_CRT}}
+
+  convert-letsencrypt-to-java-stores:
+    desc: "Convert Let's Encrypt certificates to Java keystores"
+    deps: [run-certbot]
+    cmds:
+      - |
+        openssl pkcs12 -export \
+          -in {{.SERVER_CRT}} \
+          -inkey {{.SERVER_KEY}} \
+          -out {{.KEYSTORE_P12}} \
+          -name server \
+          -password pass:{{.GENERIC_PSW}}
+      - |
+        keytool -importkeystore \
+          -srckeystore {{.KEYSTORE_P12}} \
+          -srcstoretype PKCS12 \
+          -destkeystore {{.KEYSTORE_JKS}} \
+          -deststoretype JKS \
+          -srcstorepass {{.GENERIC_PSW}} \
+          -deststorepass {{.GENERIC_PSW}} \
+          -noprompt
+    status:
+      - test -f {{.KEYSTORE_JKS}}
+
+  setup-letsencrypt-truststore:
+    desc: "Create Java truststore with Let's Encrypt CA certificates"
+    deps: [create-cert-dir]
+    cmds:
+      - |
+        # Download Let's Encrypt root and intermediate certificates
+        curl -s https://letsencrypt.org/certs/isrgrootx1.pem -o {{.ROOT_DIR}}/{{.CERT_DIR}}/isrgrootx1.pem
+        curl -s https://letsencrypt.org/certs/lets-encrypt-r3.pem -o {{.ROOT_DIR}}/{{.CERT_DIR}}/lets-encrypt-r3.pem
+      - |
+        # Import Let's Encrypt certificates into truststore
+        keytool -import -trustcacerts -alias letsencrypt-root \
+          -file {{.ROOT_DIR}}/{{.CERT_DIR}}/isrgrootx1.pem \
+          -keystore {{.TRUSTSTORE_JKS}} \
+          -storepass {{.GENERIC_PSW}} -noprompt
+      - |
+        keytool -import -trustcacerts -alias letsencrypt-intermediate \
+          -file {{.ROOT_DIR}}/{{.CERT_DIR}}/lets-encrypt-r3.pem \
+          -keystore {{.TRUSTSTORE_JKS}} \
+          -storepass {{.GENERIC_PSW}} -noprompt
+    status:
+      - test -f {{.TRUSTSTORE_JKS}}
+
+  renew-letsencrypt-certificates:
+    desc: "Renew Let's Encrypt certificates - Run this periodically (every 60 days)"
+    cmds:
+      - |
+        docker run --rm \
+          -v {{.ROOT_DIR}}/{{.CERT_DIR}}:/etc/letsencrypt \
+          -v {{.ROOT_DIR}}/{{.CERT_DIR}}/webroot:/var/www/certbot \
+          certbot/certbot renew \
+          --non-interactive
+      - cp {{.ROOT_DIR}}/{{.CERT_DIR}}/live/{{.MACHINE_URL}}/privkey.pem {{.SERVER_KEY}}
+      - cp {{.ROOT_DIR}}/{{.CERT_DIR}}/live/{{.MACHINE_URL}}/fullchain.pem {{.SERVER_CRT}}
+      - task: convert-letsencrypt-to-java-stores
+
   generate-ca-key:
     desc: "Generate Certificate Authority private key - Creates the root CA key (4096-bit RSA)"
     deps: [create-cert-dir]
@@ -177,6 +264,13 @@ tasks:
       - task: generate-java-keystore
       - task: generate-java-truststore
 
+  # Alternative certificate generation using Let's Encrypt
+  generate-certificates-letsencrypt:
+    desc: "Generate Let's Encrypt certificates - Alternative to self-signed certificates for production use"
+    deps: [validate-config]
+    cmds:
+      - task: generate-letsencrypt-certificates
+
   verify-certificates:
     desc: "Validate SSL certificates - Displays certificate details and verifies the certificate chain"
     deps: [generate-certificates]
@@ -229,6 +323,17 @@ tasks:
     cmds:
       - task: setup
       - task: generate-certificates
+      - task: verify-certificates
+      - task: configure-ansible
+      - task: deploy
+
+  # Alternative deployment with Let's Encrypt certificates
+  diva-letsencrypt:
+    desc: "Complete DIVA deployment with Let's Encrypt certificates - Production-ready setup with trusted certificates"
+    deps: [validate-config]
+    cmds:
+      - task: setup
+      - task: generate-certificates-letsencrypt
       - task: verify-certificates
       - task: configure-ansible
       - task: deploy
