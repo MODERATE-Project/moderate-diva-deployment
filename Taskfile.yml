@@ -12,12 +12,7 @@ vars:
   NIFI_SETUP_DIR: nifi
   CONFIG_DIR: config
   CERT_DIR: certificates
-  CA_KEY: "{{.ROOT_DIR}}/{{.CERT_DIR}}/ca.key"
-  CA_CRT: "{{.ROOT_DIR}}/{{.CERT_DIR}}/ca.crt"
-  CA_PEM: "{{.ROOT_DIR}}/{{.CERT_DIR}}/ca.pem"
-  CA_DER: "{{.ROOT_DIR}}/{{.CERT_DIR}}/ca.der"
   SERVER_KEY: "{{.ROOT_DIR}}/{{.CERT_DIR}}/server.key"
-  SERVER_CSR: "{{.ROOT_DIR}}/{{.CERT_DIR}}/server.csr"
   SERVER_CRT: "{{.ROOT_DIR}}/{{.CERT_DIR}}/server.crt"
   KEYSTORE_JKS: "{{.ROOT_DIR}}/{{.CERT_DIR}}/keystore.jks"
   TRUSTSTORE_JKS: "{{.ROOT_DIR}}/{{.CERT_DIR}}/truststore.jks"
@@ -30,67 +25,71 @@ dotenv:
 tasks:
   # Configuration Validation
   validate-config:
-    desc: "Validate mandatory configuration variables - Ensures all required variables are properly set before deployment"
+    desc: "Check that all required environment variables are set"
     cmds:
       - ./scripts/validate-config.sh
 
   # System Requirements & Dependencies
   check-dependencies:
-    desc: "Check system requirements - Verify Docker, Ansible, Python and required tools are installed"
-    deps: [validate-config]
+    desc: "Verify that Docker, Ansible, Python and other required tools are installed"
+    deps:
+      - validate-config
     cmds:
       - docker --version
       - docker compose version
-      - ansible --version
       - python3 --version
-      - python3 -c "import jinja2; print(jinja2.__version__)" || exit 1
+      - ansible --version
       - envsubst --help > /dev/null
 
   # Environment Setup
   setup:
-    desc: "Initial environment setup - Clone repositories and authenticate with registry"
-    deps: [check-dependencies]
+    desc: "Set up the deployment environment by cloning repositories and logging into registry"
+    deps:
+      - check-dependencies
     cmds:
-      - task: clone
-      - task: login-registry
+      - clone
+      - login-registry
 
   clone-ansible-configurator:
-    desc: "Clone ansible-configurator repository - Downloads the main deployment configuration"
+    desc: "Clone the ansible-configurator repository"
     cmds:
       - git clone {{.GIT_URL_ANSIBLE_CONFIGURATOR}} {{.ANSIBLE_CONFIGURATOR_DIR}}
     status:
       - test -d {{.ANSIBLE_CONFIGURATOR_DIR}}
 
   clone:
-    desc: "Clone all required repositories - Ensures all deployment dependencies are available"
+    desc: "Clone all required repositories"
     cmds:
       - task: clone-ansible-configurator
 
   login-registry:
-    desc: "Authenticate with Docker registry - Required to pull private container images"
+    desc: "Log into the Docker registry to access private images"
     cmds:
       - docker login {{.IMAGE_REGISTRY_URL}}
 
   # Certificate Management
   create-cert-dir:
-    desc: "Create certificates directory - Prepares workspace for SSL certificate generation"
+    desc: "Create the certificates directory"
     cmds:
       - mkdir -p {{.CERT_DIR}}
     status:
       - test -d {{.CERT_DIR}}
 
   # Let's Encrypt Certificate Tasks
-  generate-letsencrypt-certificates:
-    desc: "Generate Let's Encrypt SSL certificates - Uses certbot in Docker for trusted certificates"
-    deps: [create-cert-dir, validate-config]
+  generate-certificates:
+    desc: "Generate SSL certificates using Let's Encrypt"
+    deps:
+      - create-cert-dir
+      - validate-config
     cmds:
       - task: run-certbot
       - task: convert-letsencrypt-to-java-stores
       - task: setup-letsencrypt-truststore
 
   run-certbot:
-    desc: "Run certbot to obtain Let's Encrypt certificates"
-    deps: [create-cert-dir]
+    desc: "Obtain SSL certificates from Let's Encrypt using certbot"
+    deps:
+      - create-cert-dir
     cmds:
       - >
         docker run --rm
@@ -109,8 +108,9 @@ tasks:
       - test -f {{.SERVER_KEY}} && test -f {{.SERVER_CRT}}
 
   convert-letsencrypt-to-java-stores:
-    desc: "Convert Let's Encrypt certificates to Java keystores"
-    deps: [run-certbot]
+    desc: "Convert Let's Encrypt certificates to Java keystore format"
+    deps:
+      - run-certbot
     cmds:
       - >
         openssl pkcs12 -export
@@ -132,8 +132,9 @@ tasks:
       - test -f {{.KEYSTORE_JKS}}
 
   setup-letsencrypt-truststore:
-    desc: "Create Java truststore with Let's Encrypt CA certificates"
-    deps: [create-cert-dir]
+    desc: "Create Java truststore with Let's Encrypt root certificates"
+    deps:
+      - create-cert-dir
     cmds:
       - |
         # Download Let's Encrypt root and intermediate certificates
@@ -152,8 +153,8 @@ tasks:
     status:
       - test -f {{.TRUSTSTORE_JKS}}
 
-  renew-letsencrypt-certificates:
-    desc: "Renew Let's Encrypt certificates - Run this periodically"
+  renew-certificates:
+    desc: "Renew existing Let's Encrypt certificates"
     cmds:
       - >
         docker run --rm
@@ -165,116 +166,11 @@ tasks:
       - cp {{.ROOT_DIR}}/{{.CERT_DIR}}/live/{{.MACHINE_URL}}/fullchain.pem {{.SERVER_CRT}}
       - task: convert-letsencrypt-to-java-stores
 
-  generate-ca-key:
-    desc: "Generate Certificate Authority private key - Creates the root CA key (4096-bit RSA)"
-    deps: [create-cert-dir]
-    cmds:
-      - openssl genrsa -out {{.CA_KEY}} 4096
-    status:
-      - test -f {{.CA_KEY}}
-
-  generate-ca-cert:
-    desc: "Generate Certificate Authority certificate - Creates the root CA certificate (valid 10 years)"
-    deps: [generate-ca-key]
-    cmds:
-      - openssl req -new -x509 -days 3650 -key {{.CA_KEY}} -out {{.CA_CRT}} -subj "{{.CA_SUBJECT}}"
-    status:
-      - test -f {{.CA_CRT}}
-
-  generate-ca-pem:
-    desc: "Convert CA certificate to PEM format - Creates PEM version for broader compatibility"
-    deps: [generate-ca-cert]
-    cmds:
-      - cp {{.CA_CRT}} {{.CA_PEM}}
-    status:
-      - test -f {{.CA_PEM}}
-
-  generate-ca-der:
-    desc: "Convert CA certificate to DER format - Creates binary DER version for specific applications"
-    deps: [generate-ca-cert]
-    cmds:
-      - openssl x509 -in {{.CA_CRT}} -outform DER -out {{.CA_DER}}
-    status:
-      - test -f {{.CA_DER}}
-
-  generate-server-key:
-    desc: "Generate server private key - Creates private key for SSL server certificate (4096-bit RSA)"
-    deps: [create-cert-dir]
-    cmds:
-      - openssl genrsa -out {{.SERVER_KEY}} 4096
-    status:
-      - test -f {{.SERVER_KEY}}
-
-  generate-server-csr:
-    desc: "Generate server certificate signing request - Creates CSR for server certificate"
-    deps: [generate-server-key]
-    cmds:
-      - openssl req -new -key {{.SERVER_KEY}} -out {{.SERVER_CSR}} -subj "{{.SERVER_SUBJECT}}"
-    status:
-      - test -f {{.SERVER_CSR}}
-
-  generate-server-cert:
-    desc: "Generate signed server certificate - Creates CA-signed server certificate (valid 1 year)"
-    deps: [generate-server-csr, generate-ca-cert]
-    cmds:
-      - openssl x509 -req -in {{.SERVER_CSR}} -CA {{.CA_CRT}} -CAkey {{.CA_KEY}} -CAcreateserial -out {{.SERVER_CRT}} -days 365
-    status:
-      - test -f {{.SERVER_CRT}}
-
-  generate-pkcs12-keystore:
-    desc: "Create PKCS12 keystore - Bundles server certificate and key for Java applications"
-    deps: [generate-server-cert]
-    cmds:
-      - openssl pkcs12 -export -in {{.SERVER_CRT}} -inkey {{.SERVER_KEY}} -out {{.KEYSTORE_P12}} -name server -password pass:{{.GENERIC_PSW}}
-    status:
-      - test -f {{.KEYSTORE_P12}}
-
-  generate-java-keystore:
-    desc: "Convert to Java JKS keystore - Creates Java-compatible keystore from PKCS12"
-    deps: [generate-pkcs12-keystore]
-    cmds:
-      - >
-        keytool -importkeystore -srckeystore {{.KEYSTORE_P12}}
-        -srcstoretype PKCS12 -destkeystore {{.KEYSTORE_JKS}}
-        -deststoretype JKS -srcstorepass {{.GENERIC_PSW}}
-        -deststorepass {{.GENERIC_PSW}} -noprompt
-    status:
-      - test -f {{.KEYSTORE_JKS}}
-
-  generate-java-truststore:
-    desc: "Create Java truststore - Stores CA certificate for Java applications to trust connections"
-    deps: [generate-ca-cert]
-    cmds:
-      - keytool -import -trustcacerts -alias ca -file {{.CA_CRT}} -keystore {{.TRUSTSTORE_JKS}} -storepass {{.GENERIC_PSW}} -noprompt
-    status:
-      - test -f {{.TRUSTSTORE_JKS}}
-
-  generate-certificates:
-    desc: "Generate complete SSL certificate chain - Creates all certificates and keystores needed for deployment"
-    deps: [validate-config]
-    cmds:
-      - task: generate-ca-key
-      - task: generate-ca-cert
-      - task: generate-ca-pem
-      - task: generate-ca-der
-      - task: generate-server-key
-      - task: generate-server-csr
-      - task: generate-server-cert
-      - task: generate-java-keystore
-      - task: generate-java-truststore
-
-  # Alternative certificate generation using Let's Encrypt
-  generate-certificates-letsencrypt:
-    desc: "Generate Let's Encrypt certificates - Alternative to self-signed certificates for production use"
-    deps: [validate-config]
-    cmds:
-      - task: generate-letsencrypt-certificates
-
   verify-certificates:
-    desc: "Validate SSL certificates - Displays certificate details and verifies the certificate chain"
-    deps: [generate-certificates]
+    desc: "Verify that SSL certificates are valid and display their details"
+    deps:
+      - generate-certificates
     env:
-      CA_CRT: "{{.CA_CRT}}"
       SERVER_CRT: "{{.SERVER_CRT}}"
       KEYSTORE_JKS: "{{.KEYSTORE_JKS}}"
       TRUSTSTORE_JKS: "{{.TRUSTSTORE_JKS}}"
@@ -284,8 +180,10 @@ tasks:
 
   # Configuration & Deployment
   configure-ansible:
-    desc: "Configure Ansible playbooks - Generate configuration files from templates using environment variables"
-    deps: [clone-ansible-configurator, validate-config]
+    desc: "Generate Ansible configuration files from templates"
+    deps:
+      - clone-ansible-configurator
+      - validate-config
     cmds:
       - envsubst < {{.CONFIG_DIR}}/general.params.yml.tpl > {{.ANSIBLE_CONFIGURATOR_DIR}}/params.yml
       - envsubst < {{.CONFIG_DIR}}/keycloak.params.yml.tpl > {{.ANSIBLE_CONFIGURATOR_DIR}}/Keycloak/params.yml
@@ -295,30 +193,33 @@ tasks:
       - envsubst < {{.CONFIG_DIR}}/quality_reporter.params.yml.tpl > {{.ANSIBLE_CONFIGURATOR_DIR}}/Quality_Reporter/params.yml
 
   deploy:
-    desc: "Deploy DIVA infrastructure - Launch all services using Ansible (requires sudo password)"
-    deps: [configure-ansible]
+    desc: "Deploy the complete DIVA infrastructure using Ansible"
+    deps:
+      - configure-ansible
     dir: "{{.ANSIBLE_CONFIGURATOR_DIR}}"
     cmds:
       - ansible-playbook -K ansible-plb.yml
 
   down:
-    desc: "Stop and remove all services - Gracefully shutdown the entire DIVA infrastructure"
+    desc: "Stop and remove all DIVA services"
     dir: "{{.ANSIBLE_CONFIGURATOR_DIR}}"
     cmds:
       - ansible-playbook -K ansible-plb.yml --tags never
 
   # OAuth Configuration Update
   update-oauth:
-    desc: "Update OAuth client secrets - Apply new Keycloak-generated secrets to all services"
-    deps: [validate-config]
+    desc: "Update OAuth client secrets and redeploy services"
+    deps:
+      - validate-config
     cmds:
       - task: configure-ansible
       - task: deploy
 
   # Main Deployment Task
   diva:
-    desc: "Complete DIVA deployment - One-command setup: environment, configuration, and deployment"
-    deps: [validate-config]
+    desc: "Deploy DIVA with Let's Encrypt certificates (complete setup)"
+    deps:
+      - validate-config
     cmds:
       - task: setup
       - task: generate-certificates
@@ -326,25 +227,14 @@ tasks:
       - task: configure-ansible
       - task: deploy
 
-  # Alternative deployment with Let's Encrypt certificates
-  diva-letsencrypt:
-    desc: "Complete DIVA deployment with Let's Encrypt certificates - Production-ready setup with trusted certificates"
-    deps: [validate-config]
-    cmds:
-      - task: setup
-      - task: generate-certificates-letsencrypt
-      - task: verify-certificates
-      - task: configure-ansible
-      - task: deploy
-
   # Cleanup Tasks
   clean-certificates:
-    desc: "Remove SSL certificates - Delete all generated certificates and keystores"
+    desc: "Remove all generated SSL certificates and keystores"
     cmds:
       - rm -rf {{.CERT_DIR}}
 
   clean:
-    desc: "Clean workspace - Remove all generated files and cloned repositories"
+    desc: "Remove all generated files and cloned repositories"
     cmds:
       - rm -rf {{.ROOT_DIR}}/{{.ANSIBLE_CONFIGURATOR_DIR}}
       - rm -rf {{.ROOT_DIR}}/{{.KAFKA_SETUP_DIR}}
