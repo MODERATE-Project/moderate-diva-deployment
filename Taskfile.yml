@@ -252,6 +252,8 @@ tasks:
     deps: [validate-config]
     cmds:
       - task: setup
+      - task: generate-certificates
+      - task: verify-certificates
       - task: configure-ansible
       - task: deploy
 
