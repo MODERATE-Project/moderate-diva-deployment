@@ -111,10 +111,14 @@ validate_auth_key() {
             "" \
             "Current value: $AUTH_KEY" \
             "" \
-            "Expected format: ssh-rsa AAAAB3NzaC1yc2E... your-email@domain.com" \
+            "Supported key formats:" \
+            "- RSA: ssh-rsa AAAAB3NzaC1yc2E... your-email@domain.com" \
+            "- Ed25519: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5... your-email@domain.com" \
             "" \
             "Steps to fix:" \
-            "1. Generate an SSH key pair: ssh-keygen -t rsa -b 4096 -C 'your-email@domain.com'" \
+            "1. Generate an SSH key pair:" \
+            "   - RSA: ssh-keygen -t rsa -b 4096 -C 'your-email@domain.com'" \
+            "   - Ed25519 (recommended): ssh-keygen -t ed25519 -C 'your-email@domain.com'" \
             "2. Add the public key to your GitLab account" \
             "3. Copy the COMPLETE public key content to AUTH_KEY in .env"
     fi
@@ -122,10 +126,12 @@ validate_auth_key() {
 
 # Validate AUTH_KEY format appears to be a valid SSH key
 validate_auth_key_format() {
-    if ! echo "$AUTH_KEY" | grep -q "^ssh-rsa AAAAB3NzaC1yc2E"; then
-        print_error "AUTH_KEY does not appear to be a valid SSH RSA public key!" \
+    if ! echo "$AUTH_KEY" | grep -q "^ssh-rsa AAAAB3NzaC1yc2E\|^ssh-ed25519 AAAAC3NzaC1lZDI1NTE5"; then
+        print_error "AUTH_KEY does not appear to be a valid SSH public key!" \
             "Please ensure AUTH_KEY is a complete SSH public key." \
-            "Expected format: ssh-rsa AAAAB3NzaC1yc2E... your-email@domain.com" \
+            "Supported formats:" \
+            "- RSA: ssh-rsa AAAAB3NzaC1yc2E... your-email@domain.com" \
+            "- Ed25519: ssh-ed25519 AAAAC3NzaC1lZDI1NTE5... your-email@domain.com" \
             "" \
             "Current value: $AUTH_KEY"
     fi
