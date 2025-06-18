@@ -3,7 +3,13 @@ version: "3"
 vars:
   IMAGE_REGISTRY_URL: gitlab.linksfoundation.com:5050
   GIT_URL_ANSIBLE_CONFIGURATOR: git@gitlab.linksfoundation.com:csc/csc-projects/moderate/ansible-configurator.git
+  GIT_URL_KAFKA_SETUP: git@gitlab.linksfoundation.com:csc/csc-projects/moderate/kafka.git
+  GIT_URL_KEYCLOAK_SETUP: git@gitlab.linksfoundation.com:csc/csc-projects/moderate/keycloak.git
+  GIT_URL_NIFI_SETUP: git@gitlab.linksfoundation.com:csc/csc-projects/moderate/nifi.git
   ANSIBLE_CONFIGURATOR_DIR: ansible-configurator
+  KAFKA_SETUP_DIR: kafka-setup
+  KEYCLOAK_SETUP_DIR: keycloak-setup
+  NIFI_SETUP_DIR: nifi-setup
   CONFIG_DIR: config
   CERT_DIR: certificates
   CA_KEY: "{{.ROOT_DIR}}/{{.CERT_DIR}}/ca.key"
@@ -22,9 +28,16 @@ dotenv:
   - .env.default
 
 tasks:
+  # Configuration Validation
+  validate-config:
+    desc: "Validate mandatory configuration variables - Ensures all required variables are properly set before deployment"
+    cmds:
+      - ./scripts/validate-config.sh
+
   # System Requirements & Dependencies
   check-dependencies:
     desc: "Check system requirements - Verify Docker, Ansible, Python and required tools are installed"
+    deps: [validate-config]
     cmds:
       - docker --version
       - docker compose version
@@ -48,10 +61,34 @@ tasks:
     status:
       - test -d {{.ANSIBLE_CONFIGURATOR_DIR}}
 
+  clone-kafka-setup:
+    desc: "Clone kafka-setup repository - Downloads the kafka setup configuration"
+    cmds:
+      - git clone {{.GIT_URL_KAFKA_SETUP}} {{.KAFKA_SETUP_DIR}}
+    status:
+      - test -d {{.KAFKA_SETUP_DIR}}
+
+  clone-keycloak-setup:
+    desc: "Clone keycloak-setup repository - Downloads the keycloak setup configuration"
+    cmds:
+      - git clone {{.GIT_URL_KEYCLOAK_SETUP}} {{.KEYCLOAK_SETUP_DIR}}
+    status:
+      - test -d {{.KEYCLOAK_SETUP_DIR}}
+
+  clone-nifi-setup:
+    desc: "Clone nifi-setup repository - Downloads the nifi setup configuration"
+    cmds:
+      - git clone {{.GIT_URL_NIFI_SETUP}} {{.NIFI_SETUP_DIR}}
+    status:
+      - test -d {{.NIFI_SETUP_DIR}}
+
   clone:
     desc: "Clone all required repositories - Ensures all deployment dependencies are available"
     cmds:
       - task: clone-ansible-configurator
+      - task: clone-kafka-setup
+      - task: clone-keycloak-setup
+      - task: clone-nifi-setup
 
   login-registry:
     desc: "Authenticate with Docker registry - Required to pull private container images"
@@ -134,7 +171,11 @@ tasks:
     desc: "Convert to Java JKS keystore - Creates Java-compatible keystore from PKCS12"
     deps: [generate-pkcs12-keystore]
     cmds:
-      - keytool -importkeystore -srckeystore {{.KEYSTORE_P12}} -srcstoretype PKCS12 -destkeystore {{.KEYSTORE_JKS}} -deststoretype JKS -srcstorepass {{.KEYSTORE_PASSWORD}} -deststorepass {{.KEYSTORE_PASSWORD}} -noprompt
+      - >
+        keytool -importkeystore -srckeystore {{.KEYSTORE_P12}}
+        -srcstoretype PKCS12 -destkeystore {{.KEYSTORE_JKS}}
+        -deststoretype JKS -srcstorepass {{.KEYSTORE_PASSWORD}}
+        -deststorepass {{.KEYSTORE_PASSWORD}} -noprompt
     status:
       - test -f {{.KEYSTORE_JKS}}
 
@@ -148,6 +189,7 @@ tasks:
 
   generate-certificates:
     desc: "Generate complete SSL certificate chain - Creates all certificates and keystores needed for deployment"
+    deps: [validate-config]
     cmds:
       - task: generate-ca-key
       - task: generate-ca-cert
@@ -161,38 +203,20 @@ tasks:
 
   verify-certificates:
     desc: "Validate SSL certificates - Displays certificate details and verifies the certificate chain"
-    silent: true
     deps: [generate-certificates]
+    env:
+      CA_CRT: "{{.CA_CRT}}"
+      SERVER_CRT: "{{.SERVER_CRT}}"
+      KEYSTORE_JKS: "{{.KEYSTORE_JKS}}"
+      TRUSTSTORE_JKS: "{{.TRUSTSTORE_JKS}}"
+      KEYSTORE_PASSWORD: "{{.KEYSTORE_PASSWORD}}"
     cmds:
-      - echo "╔════════════════════════════════════════════════════════════╗"
-      - echo "║                    CA Certificate Details                  ║"
-      - echo "╚════════════════════════════════════════════════════════════╝"
-      - openssl x509 -in {{.CA_CRT}} -text -noout
-      - echo ""
-      - echo "╔════════════════════════════════════════════════════════════╗"
-      - echo "║                  Server Certificate Details                ║"
-      - echo "╚════════════════════════════════════════════════════════════╝"
-      - openssl x509 -in {{.SERVER_CRT}} -text -noout
-      - echo ""
-      - echo "╔════════════════════════════════════════════════════════════╗"
-      - echo "║           Verifying Server Certificate against CA          ║"
-      - echo "╚════════════════════════════════════════════════════════════╝"
-      - openssl verify -CAfile {{.CA_CRT}} {{.SERVER_CRT}}
-      - echo ""
-      - echo "╔════════════════════════════════════════════════════════════╗"
-      - echo "║                  Java Keystore Contents                    ║"
-      - echo "╚════════════════════════════════════════════════════════════╝"
-      - keytool -list -keystore {{.KEYSTORE_JKS}} -storepass {{.KEYSTORE_PASSWORD}}
-      - echo ""
-      - echo "╔════════════════════════════════════════════════════════════╗"
-      - echo "║                 Java Truststore Contents                   ║"
-      - echo "╚════════════════════════════════════════════════════════════╝"
-      - keytool -list -keystore {{.TRUSTSTORE_JKS}} -storepass {{.KEYSTORE_PASSWORD}}
+      - ./scripts/verify-certificates.sh
 
   # Configuration & Deployment
   configure-ansible:
     desc: "Configure Ansible playbooks - Generate configuration files from templates using environment variables"
-    deps: [clone-ansible-configurator]
+    deps: [clone-ansible-configurator, validate-config]
     cmds:
       - envsubst < {{.CONFIG_DIR}}/general.params.yml.tpl > {{.ANSIBLE_CONFIGURATOR_DIR}}/params.yml
       - envsubst < {{.CONFIG_DIR}}/keycloak.params.yml.tpl > {{.ANSIBLE_CONFIGURATOR_DIR}}/Keycloak/params.yml
@@ -214,9 +238,18 @@ tasks:
     cmds:
       - ansible-playbook -K ansible-plb.yml --tags never
 
+  # OAuth Configuration Update
+  update-oauth:
+    desc: "Update OAuth client secrets - Apply new Keycloak-generated secrets to all services"
+    deps: [validate-config]
+    cmds:
+      - task: configure-ansible
+      - task: deploy
+
   # Main Deployment Task
   diva:
     desc: "Complete DIVA deployment - One-command setup: environment, configuration, and deployment"
+    deps: [validate-config]
     cmds:
       - task: setup
       - task: configure-ansible
@@ -232,4 +265,7 @@ tasks:
     desc: "Clean workspace - Remove all generated files and cloned repositories"
     cmds:
       - rm -rf {{.ANSIBLE_CONFIGURATOR_DIR}}
+      - rm -rf {{.KAFKA_SETUP_DIR}}
+      - rm -rf {{.KEYCLOAK_SETUP_DIR}}
+      - rm -rf {{.NIFI_SETUP_DIR}}
       - task: clean-certificates
