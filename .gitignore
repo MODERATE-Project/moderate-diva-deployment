@@ -7,6 +7,10 @@ certificates/
 kafka-setup/
 keycloak-setup/
 nifi-setup/
+kafka/
+keycloak/
+nifi/
+config/docker-compose-*.yml
 
 ## Linux
 ########
@@ -63,7 +67,6 @@ $RECYCLE.BIN/
 .DS_Store
 .AppleDouble
 .LSOverride
-Icon[]
 
 # Thumbnails
 ._*

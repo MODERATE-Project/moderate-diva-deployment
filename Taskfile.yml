@@ -7,9 +7,9 @@ vars:
   GIT_URL_KEYCLOAK_SETUP: git@gitlab.linksfoundation.com:csc/csc-projects/moderate/keycloak.git
   GIT_URL_NIFI_SETUP: git@gitlab.linksfoundation.com:csc/csc-projects/moderate/nifi.git
   ANSIBLE_CONFIGURATOR_DIR: ansible-configurator
-  KAFKA_SETUP_DIR: kafka-setup
-  KEYCLOAK_SETUP_DIR: keycloak-setup
-  NIFI_SETUP_DIR: nifi-setup
+  KAFKA_SETUP_DIR: kafka
+  KEYCLOAK_SETUP_DIR: keycloak
+  NIFI_SETUP_DIR: nifi
   CONFIG_DIR: config
   CERT_DIR: certificates
   CA_KEY: "{{.ROOT_DIR}}/{{.CERT_DIR}}/ca.key"
@@ -61,34 +61,10 @@ tasks:
     status:
       - test -d {{.ANSIBLE_CONFIGURATOR_DIR}}
 
-  clone-kafka-setup:
-    desc: "Clone kafka-setup repository - Downloads the kafka setup configuration"
-    cmds:
-      - git clone {{.GIT_URL_KAFKA_SETUP}} {{.KAFKA_SETUP_DIR}}
-    status:
-      - test -d {{.KAFKA_SETUP_DIR}}
-
-  clone-keycloak-setup:
-    desc: "Clone keycloak-setup repository - Downloads the keycloak setup configuration"
-    cmds:
-      - git clone {{.GIT_URL_KEYCLOAK_SETUP}} {{.KEYCLOAK_SETUP_DIR}}
-    status:
-      - test -d {{.KEYCLOAK_SETUP_DIR}}
-
-  clone-nifi-setup:
-    desc: "Clone nifi-setup repository - Downloads the nifi setup configuration"
-    cmds:
-      - git clone {{.GIT_URL_NIFI_SETUP}} {{.NIFI_SETUP_DIR}}
-    status:
-      - test -d {{.NIFI_SETUP_DIR}}
-
   clone:
     desc: "Clone all required repositories - Ensures all deployment dependencies are available"
     cmds:
       - task: clone-ansible-configurator
-      - task: clone-kafka-setup
-      - task: clone-keycloak-setup
-      - task: clone-nifi-setup
 
   login-registry:
     desc: "Authenticate with Docker registry - Required to pull private container images"
@@ -266,8 +242,8 @@ tasks:
   clean:
     desc: "Clean workspace - Remove all generated files and cloned repositories"
     cmds:
-      - rm -rf {{.ANSIBLE_CONFIGURATOR_DIR}}
-      - rm -rf {{.KAFKA_SETUP_DIR}}
-      - rm -rf {{.KEYCLOAK_SETUP_DIR}}
-      - rm -rf {{.NIFI_SETUP_DIR}}
+      - rm -rf {{.ROOT_DIR}}/{{.ANSIBLE_CONFIGURATOR_DIR}}
+      - rm -rf {{.ROOT_DIR}}/{{.KAFKA_SETUP_DIR}}
+      - rm -rf {{.ROOT_DIR}}/{{.KEYCLOAK_SETUP_DIR}}
+      - rm -rf {{.ROOT_DIR}}/{{.NIFI_SETUP_DIR}}
       - task: clean-certificates
