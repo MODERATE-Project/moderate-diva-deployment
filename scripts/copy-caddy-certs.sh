@@ -39,8 +39,15 @@ TIMEOUT=300
 ELAPSED=0
 while [ $ELAPSED -lt $TIMEOUT ]; do
     # Look for certificate files in the Caddy data directory
-    CRT_FILE=$(find "$CADDY_DATA_DIR" -name "*.crt" -path "*$MACHINE_URL*" 2>/dev/null | head -1 || echo "")
-    KEY_FILE=$(find "$CADDY_DATA_DIR" -name "*.key" -path "*$MACHINE_URL*" 2>/dev/null | head -1 || echo "")
+    # First try to find exact domain match (top-level domain)
+    CRT_FILE=$(find "$CADDY_DATA_DIR" -name "*.crt" -path "*/$MACHINE_URL/*" 2>/dev/null | head -1 || echo "")
+    KEY_FILE=$(find "$CADDY_DATA_DIR" -name "*.key" -path "*/$MACHINE_URL/*" 2>/dev/null | head -1 || echo "")
+    
+    # If exact domain not found, try broader search but prioritize shorter paths (likely top-level)
+    if [ -z "$CRT_FILE" ] || [ -z "$KEY_FILE" ]; then
+        CRT_FILE=$(find "$CADDY_DATA_DIR" -name "*.crt" -path "*$MACHINE_URL*" 2>/dev/null | awk '{print length($0) " " $0}' | sort -n | head -1 | cut -d' ' -f2- || echo "")
+        KEY_FILE=$(find "$CADDY_DATA_DIR" -name "*.key" -path "*$MACHINE_URL*" 2>/dev/null | awk '{print length($0) " " $0}' | sort -n | head -1 | cut -d' ' -f2- || echo "")
+    fi
 
     if [ -n "$CRT_FILE" ] && [ -n "$KEY_FILE" ] && [ -s "$CRT_FILE" ] && [ -s "$KEY_FILE" ]; then
         echo "Certificates found in Caddy data directory"
@@ -52,13 +59,21 @@ while [ $ELAPSED -lt $TIMEOUT ]; do
     ELAPSED=$((ELAPSED + 5))
 done
 
-# Final check for certificate files
-CRT_FILE=$(find "$CADDY_DATA_DIR" -name "*.crt" -path "*$MACHINE_URL*" 2>/dev/null | head -1 || echo "")
-KEY_FILE=$(find "$CADDY_DATA_DIR" -name "*.key" -path "*$MACHINE_URL*" 2>/dev/null | head -1 || echo "")
+# Final check for certificate files with improved selection logic
+# First try to find exact domain match (top-level domain)
+CRT_FILE=$(find "$CADDY_DATA_DIR" -name "*.crt" -path "*/$MACHINE_URL/*" 2>/dev/null | head -1 || echo "")
+KEY_FILE=$(find "$CADDY_DATA_DIR" -name "*.key" -path "*/$MACHINE_URL/*" 2>/dev/null | head -1 || echo "")
 
-# If domain-specific certificates not found, try generic search
+# If exact domain not found, try broader search but prioritize shorter paths (likely top-level)
 if [ -z "$CRT_FILE" ] || [ -z "$KEY_FILE" ]; then
-    echo "Domain-specific certificates not found, searching for any certificates..."
+    echo "Exact domain match not found, searching for certificates with domain in path..."
+    CRT_FILE=$(find "$CADDY_DATA_DIR" -name "*.crt" -path "*$MACHINE_URL*" 2>/dev/null | awk '{print length($0) " " $0}' | sort -n | head -1 | cut -d' ' -f2- || echo "")
+    KEY_FILE=$(find "$CADDY_DATA_DIR" -name "*.key" -path "*$MACHINE_URL*" 2>/dev/null | awk '{print length($0) " " $0}' | sort -n | head -1 | cut -d' ' -f2- || echo "")
+fi
+
+# Final fallback: if still no certificates found, try generic search
+if [ -z "$CRT_FILE" ] || [ -z "$KEY_FILE" ]; then
+    echo "Domain-specific certificates not found, searching for any certificates as fallback..."
     CRT_FILE=$(find "$CADDY_DATA_DIR" -name "*.crt" 2>/dev/null | head -1 || echo "")
     KEY_FILE=$(find "$CADDY_DATA_DIR" -name "*.key" 2>/dev/null | head -1 || echo "")
 fi
@@ -71,6 +86,10 @@ if [ -z "$CRT_FILE" ] || [ -z "$KEY_FILE" ]; then
     ls -la "$CADDY_DATA_DIR" 2>/dev/null || echo "Caddy data directory not accessible"
     exit 1
 fi
+
+echo "Selected certificate files:"
+echo "Certificate: $CRT_FILE"
+echo "Private key: $KEY_FILE"
 
 # Copy certificates to the target directory
 # If the target files exist, remove them first

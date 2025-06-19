@@ -57,6 +57,7 @@ This section involves manual configuration of OAuth clients in Keycloak for secu
 
 1. Wait for Keycloak prompt: `After Keycloak deployment, you have to manually create a client for NiFi [...]`
 2. Access Keycloak at `KEYCLOAK_URL` and create OAuth clients for *Kafka*, *NiFi*, and *Grafana*
-3. Copy client secrets to `.env` file (`KAFKA_KEYCLOAK_SECRET`, `NIFI_KEYCLOAK_SECRET`, `GRAFANA_KEYCLOAK_SECRET`)
-4. Run `task process-configuration-templates` in separate terminal
-5. Confirm Ansible prompt to continue
+3. Ensure that the OAuth client for *NiFi* is properly configured in the *Access settings* (e.g., valid redirect URIs).
+4. Copy client secrets to `.env` file (`KAFKA_KEYCLOAK_SECRET`, `NIFI_KEYCLOAK_SECRET`, `GRAFANA_KEYCLOAK_SECRET`)
+5. Run `task process-configuration-templates` in separate terminal
+6. Confirm Ansible prompt to continue

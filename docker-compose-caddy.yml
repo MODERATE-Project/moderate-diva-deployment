@@ -1,3 +1,4 @@
+name: ${PROJECT_NAME}
 services:
   caddy:
     build:
@@ -11,8 +12,6 @@ services:
       - caddy_config:/config
       - ./caddy/data:/data
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile
-      # - ./caddy/conf.d:/etc/caddy/conf.d
-      # - ./caddy/static:/var/www/html
     cap_add:
       - NET_ADMIN
     environment:
@@ -24,4 +23,3 @@ services:
       - 443:443
 volumes:
   caddy_config: {}
-networks: {}
