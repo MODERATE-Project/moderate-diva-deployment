@@ -11,6 +11,9 @@ kafka/
 keycloak/
 nifi/
 config/docker-compose-*.yml
+caddy/*
+!caddy/.gitkeep
+!caddy/Caddyfile
 
 ## Linux
 ########

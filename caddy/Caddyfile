@@ -1,0 +1,10 @@
+{$MACHINE_URL} {
+  tls {$LETSENCRYPT_EMAIL}
+
+  log {
+    output stdout
+    level INFO
+  }
+
+  respond "Certificate management initiated for {$MACHINE_URL}. If you see this, Caddy is running." 200
+} 

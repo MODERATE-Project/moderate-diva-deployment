@@ -1,0 +1,27 @@
+services:
+  caddy:
+    build:
+      context: .
+      dockerfile: Dockerfile.caddy
+      args:
+        UID: "${UID:-1000}"
+        GID: "${GID:-1000}"
+    restart: unless-stopped
+    volumes:
+      - caddy_config:/config
+      - ./caddy/data:/data
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+      # - ./caddy/conf.d:/etc/caddy/conf.d
+      # - ./caddy/static:/var/www/html
+    cap_add:
+      - NET_ADMIN
+    environment:
+      CADDY_DEBUG: 1
+      MACHINE_URL: ${MACHINE_URL}
+      LETSENCRYPT_EMAIL: ${LETSENCRYPT_EMAIL}
+    ports:
+      - 80:80
+      - 443:443
+volumes:
+  caddy_config: {}
+networks: {}

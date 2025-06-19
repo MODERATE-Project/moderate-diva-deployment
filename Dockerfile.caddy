@@ -1,0 +1,23 @@
+FROM caddy:2.10
+
+# Grant Caddy the capability to bind to privileged ports (<1024)
+# This allows Caddy to listen on ports 80 and 443 without root privileges
+RUN setcap 'cap_net_bind_service=+ep' /usr/bin/caddy
+
+# Define build arguments for user and group IDs
+# These can be overridden during build time to match host system user
+ARG UID=1000
+ARG GID=1000
+
+# Create a system group and user for Caddy
+# TODO: Handle errors like: addgroup: gid '20' in use
+RUN addgroup --gid $GID --system caddy && \
+    adduser --uid $UID --system --ingroup caddy caddy
+
+# Create and set ownership of required directories
+# /data: For Caddy's data storage (certificates, etc.)
+# /config: For Caddy's configuration files
+RUN mkdir -p /data /config && chown -R caddy:caddy /data /config
+
+# Switch to non-root user for security and proper certificate ownership
+USER caddy
