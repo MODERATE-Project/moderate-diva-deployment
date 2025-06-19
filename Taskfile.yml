@@ -19,26 +19,13 @@ vars:
   KEYSTORE_P12: "{{.ROOT_DIR}}/{{.CERT_DIR}}/keystore.p12"
   LETSENCRYPT_X1_URL: "https://letsencrypt.org/certs/isrgrootx1.pem"
   LETSENCRYPT_R3_URL: "https://letsencrypt.org/certs/lets-encrypt-r3.pem"
+  CADDY_COMPOSE_FILE: "{{.ROOT_DIR}}/docker-compose-caddy.yml"
 
 dotenv:
   - .env
   - .env.default
 
 tasks:
-  check-sudo:
-    cmds:
-      - >
-        if [ "$(id -u)" != "0" ]; then
-          echo "This task must be run as root. Please use sudo."
-          exit 1
-        fi
-
-  chown-certs:
-    deps:
-      - check-sudo
-    cmds:
-      - chown -R $(logname):$(id -gn $(logname)) {{.ROOT_DIR}}/{{.CERT_DIR}}
-
   validate-config:
     desc: "Check that all required environment variables are set"
     cmds:
@@ -84,33 +71,37 @@ tasks:
     cmds:
       - docker login {{.IMAGE_REGISTRY_URL}}
 
-  create-cert-dir:
-    desc: "Create the certificates directory"
+  create-dirs:
+    desc: "Create the required directories"
     cmds:
       - mkdir -p {{.ROOT_DIR}}/{{.CERT_DIR}}
+      - mkdir -p {{.ROOT_DIR}}/caddy/data
     status:
       - test -d {{.ROOT_DIR}}/{{.CERT_DIR}}
 
-  run-certbot:
-    desc: "Obtain SSL certificates from Let's Encrypt using certbot"
+  start-caddy:
+    desc: "Start Caddy server for SSL certificate management"
+    vars:
+      SLEEP_TIME: 30
     deps:
-      - create-cert-dir
-      - check-sudo
+      - create-dirs
     cmds:
-      - >
-        docker run --rm
-        -v {{.ROOT_DIR}}/{{.CERT_DIR}}:/etc/letsencrypt
-        -v {{.ROOT_DIR}}/{{.CERT_DIR}}/webroot:/var/www/certbot
-        -p 80:80
-        certbot/certbot certonly
-        --standalone
-        --non-interactive
-        --agree-tos
-        --email {{.LETSENCRYPT_EMAIL}}
-        -d {{.MACHINE_URL}}
-      - cp {{.ROOT_DIR}}/{{.CERT_DIR}}/live/{{.MACHINE_URL}}/privkey.pem {{.SERVER_KEY}}
-      - cp {{.ROOT_DIR}}/{{.CERT_DIR}}/live/{{.MACHINE_URL}}/fullchain.pem {{.SERVER_CRT}}
-      - task: chown-certs
+      - docker compose -f {{.CADDY_COMPOSE_FILE}} up -d --wait
+      - cmd: echo "⌛ Waiting for Caddy to start and obtain SSL certificates..."
+        silent: true
+      - sleep {{.SLEEP_TIME}}
+
+  stop-caddy:
+    desc: "Stop Caddy server"
+    cmds:
+      - docker compose -f {{.CADDY_COMPOSE_FILE}} down
+
+  link-caddy-certificates:
+    desc: "Link SSL certificates from Caddy data directory to expected file locations (enables auto-renewal)"
+    deps:
+      - start-caddy
+    cmds:
+      - ./scripts/link-caddy-certs.sh {{.MACHINE_URL}} {{.ROOT_DIR}}/{{.CERT_DIR}}
 
   convert-letsencrypt-to-java-stores:
     desc: "Convert Let's Encrypt certificates to Java keystore format"
@@ -137,7 +128,7 @@ tasks:
   setup-letsencrypt-truststore:
     desc: "Create Java truststore with Let's Encrypt root certificates"
     deps:
-      - create-cert-dir
+      - create-dirs
     cmds:
       - curl -s {{.LETSENCRYPT_X1_URL}} -o {{.ROOT_DIR}}/{{.CERT_DIR}}/isrgrootx1.pem
       - curl -s {{.LETSENCRYPT_R3_URL}} -o {{.ROOT_DIR}}/{{.CERT_DIR}}/lets-encrypt-r3.pem
@@ -205,6 +196,7 @@ tasks:
   clean:
     desc: "Remove all generated files and cloned repositories"
     cmds:
+      - task: stop-caddy
       - rm -rf {{.ROOT_DIR}}/{{.ANSIBLE_CONFIGURATOR_DIR}}
       - rm -rf {{.ROOT_DIR}}/{{.KAFKA_SETUP_DIR}}
       - rm -rf {{.ROOT_DIR}}/{{.KEYCLOAK_SETUP_DIR}}
