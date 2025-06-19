@@ -10,6 +10,7 @@ vars:
   KAFKA_SETUP_DIR: kafka
   KEYCLOAK_SETUP_DIR: keycloak
   NIFI_SETUP_DIR: nifi
+  QUALITY_REPORTER_SETUP_DIR: quality_reporter
   CONFIG_DIR: config
   CERT_DIR: certificates
   SERVER_KEY: "{{.ROOT_DIR}}/{{.CERT_DIR}}/server.key"
@@ -192,8 +193,17 @@ tasks:
     desc: "Remove all generated files and cloned repositories"
     cmds:
       - task: stop-caddy
-      - rm -rf {{.ROOT_DIR}}/{{.ANSIBLE_CONFIGURATOR_DIR}}
+      - cmd: cd {{.ROOT_DIR}}/{{.KAFKA_SETUP_DIR}} && docker compose down
+        ignore_error: true
+      - cmd: cd {{.ROOT_DIR}}/{{.KEYCLOAK_SETUP_DIR}} && docker compose down
+        ignore_error: true
+      - cmd: cd {{.ROOT_DIR}}/{{.NIFI_SETUP_DIR}} && docker compose down
+        ignore_error: true
+      - cmd: cd {{.ROOT_DIR}}/{{.QUALITY_REPORTER_SETUP_DIR}} && docker compose down
+        ignore_error: true
       - rm -rf {{.ROOT_DIR}}/{{.KAFKA_SETUP_DIR}}
       - rm -rf {{.ROOT_DIR}}/{{.KEYCLOAK_SETUP_DIR}}
       - rm -rf {{.ROOT_DIR}}/{{.NIFI_SETUP_DIR}}
+      - rm -rf {{.ROOT_DIR}}/{{.QUALITY_REPORTER_SETUP_DIR}}
+      - rm -rf {{.ROOT_DIR}}/{{.ANSIBLE_CONFIGURATOR_DIR}}
       - rm -rf {{.ROOT_DIR}}/{{.CERT_DIR}}
