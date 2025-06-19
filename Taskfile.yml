@@ -81,27 +81,22 @@ tasks:
 
   start-caddy:
     desc: "Start Caddy server for SSL certificate management"
-    vars:
-      SLEEP_TIME: 30
     deps:
       - create-dirs
     cmds:
       - docker compose -f {{.CADDY_COMPOSE_FILE}} up -d --wait
-      - cmd: echo "⌛ Waiting for Caddy to start and obtain SSL certificates..."
-        silent: true
-      - sleep {{.SLEEP_TIME}}
 
   stop-caddy:
     desc: "Stop Caddy server"
     cmds:
       - docker compose -f {{.CADDY_COMPOSE_FILE}} down
 
-  link-caddy-certificates:
-    desc: "Link SSL certificates from Caddy data directory to expected file locations (enables auto-renewal)"
+  copy-caddy-certificates:
+    desc: "Copy SSL certificates from Caddy data directory to expected file locations (enables auto-renewal)"
     deps:
       - start-caddy
     cmds:
-      - ./scripts/link-caddy-certs.sh {{.MACHINE_URL}} {{.ROOT_DIR}}/{{.CERT_DIR}}
+      - ./scripts/copy-caddy-certs.sh {{.MACHINE_URL}} {{.ROOT_DIR}}/{{.CERT_DIR}}
 
   convert-letsencrypt-to-java-stores:
     desc: "Convert Let's Encrypt certificates to Java keystore format"

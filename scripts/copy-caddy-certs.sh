@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# Link or copy SSL certificates from Caddy's data directory to expected locations
-# This enables automatic certificate renewal by leveraging the bind-mounted caddy/data directory
-# Usage: ./link-caddy-certs.sh <machine_url> <cert_dir>
+# Copy SSL certificates from Caddy's data directory to expected locations
+# This copies certificates from the bind-mounted caddy/data directory
+# Usage: ./copy-caddy-certs.sh <machine_url> <cert_dir>
 
 set -e
 
@@ -72,7 +72,7 @@ if [ -z "$CRT_FILE" ] || [ -z "$KEY_FILE" ]; then
     exit 1
 fi
 
-# Create symbolic links to enable automatic renewal
+# Copy certificates to the target directory
 # If the target files exist, remove them first
 [ -f "$SERVER_CRT" ] && rm "$SERVER_CRT"
 [ -f "$SERVER_KEY" ] && rm "$SERVER_KEY"
@@ -80,12 +80,12 @@ fi
 # Ensure the certificate directory exists
 mkdir -p "$CERT_DIR"
 
-# The certificate files are already absolute paths from find command
-ln -s "$CRT_FILE" "$SERVER_CRT"
-ln -s "$KEY_FILE" "$SERVER_KEY"
+# Copy the certificate files
+cp "$CRT_FILE" "$SERVER_CRT"
+cp "$KEY_FILE" "$SERVER_KEY"
 
-echo "SSL certificates linked successfully:"
-echo "Certificate: $SERVER_CRT -> $CRT_FILE"
-echo "Private key: $SERVER_KEY -> $KEY_FILE"
+echo "SSL certificates copied successfully:"
+echo "Certificate: $CRT_FILE -> $SERVER_CRT"
+echo "Private key: $KEY_FILE -> $SERVER_KEY"
 echo ""
-echo "Certificates will automatically renew with Caddy - no manual intervention required!"
+echo "Note: Certificates are copied, not linked. Re-run this script after Caddy renews certificates."
