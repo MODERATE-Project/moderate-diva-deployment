@@ -61,19 +61,46 @@ tasks:
       - task: login-registry
 
   clone-ansible-configurator:
-    desc: "Clone the ansible-configurator repository and apply NiFi fix"
+    desc: "Clone the ansible-configurator repository and apply NiFi fix (idempotent - clones if missing, pulls if exists)"
     cmds:
-      - git clone {{.GIT_URL_ANSIBLE_CONFIGURATOR}} {{.ROOT_DIR}}/{{.ANSIBLE_CONFIGURATOR_DIR}}
+      - |
+        if [ -d {{.ROOT_DIR}}/{{.ANSIBLE_CONFIGURATOR_DIR}}/.git ]; then
+          cd {{.ROOT_DIR}}/{{.ANSIBLE_CONFIGURATOR_DIR}} && git pull
+        else
+          git clone {{.GIT_URL_ANSIBLE_CONFIGURATOR}} {{.ROOT_DIR}}/{{.ANSIBLE_CONFIGURATOR_DIR}}
+        fi
       - >
         cp {{.ROOT_DIR}}/overrides/nifi-ansible-plb.yml
         {{.ROOT_DIR}}/{{.ANSIBLE_CONFIGURATOR_DIR}}/NiFi/ansible-plb.yml
     status:
-      - test -d {{.ANSIBLE_CONFIGURATOR_DIR}}
+      - test -d {{.ROOT_DIR}}/{{.ANSIBLE_CONFIGURATOR_DIR}}/.git
 
   clone:
     desc: "Clone all required repositories"
     cmds:
       - task: clone-ansible-configurator
+
+  update-repos:
+    desc: "Pull latest changes from all Git repositories (requires ansible-configurator to be cloned)"
+    preconditions:
+      - test -d {{.ROOT_DIR}}/{{.ANSIBLE_CONFIGURATOR_DIR}}/.git
+    cmds:
+      - cd {{.ROOT_DIR}}/{{.ANSIBLE_CONFIGURATOR_DIR}} && git pull
+      - >
+        cp {{.ROOT_DIR}}/overrides/nifi-ansible-plb.yml
+        {{.ROOT_DIR}}/{{.ANSIBLE_CONFIGURATOR_DIR}}/NiFi/ansible-plb.yml
+      - |
+        if [ -d {{.ROOT_DIR}}/{{.KAFKA_SETUP_DIR}}/.git ]; then
+          cd {{.ROOT_DIR}}/{{.KAFKA_SETUP_DIR}} && git pull
+        fi
+      - |
+        if [ -d {{.ROOT_DIR}}/{{.KEYCLOAK_SETUP_DIR}}/.git ]; then
+          cd {{.ROOT_DIR}}/{{.KEYCLOAK_SETUP_DIR}} && git pull
+        fi
+      - |
+        if [ -d {{.ROOT_DIR}}/{{.NIFI_SETUP_DIR}}/.git ]; then
+          cd {{.ROOT_DIR}}/{{.NIFI_SETUP_DIR}} && git pull
+        fi
 
   login-registry:
     desc: "Log into the Docker registry to access private images"
