@@ -35,12 +35,30 @@ task setup
 
 ### SSL Certificates
 
-This section handles SSL certificate management for secure communication across all services. The `copy-caddy-certificates` task starts a Caddy server to automatically obtain Let's Encrypt certificates and copies them to the expected locations. The `setup-letsencrypt-truststore` task downloads Let's Encrypt root certificates and creates a Java truststore for services that require it. Finally, `convert-letsencrypt-to-java-stores` converts the PEM certificates to Java keystore format (JKS and PKCS12) for compatibility with Java-based services like Kafka and NiFi.
+This section handles SSL certificate management for secure communication across all services. Caddy automatically obtains and renews Let's Encrypt certificates, but the certificates must be copied and converted to Java keystore formats for use by Kafka, NiFi, and other Java-based services.
+
+#### Initial Certificate Setup
+
+For the initial deployment, run these tasks to set up certificates:
 
 ```bash
 task copy-caddy-certificates
 task setup-letsencrypt-truststore
 task convert-letsencrypt-to-java-stores
+```
+
+This will:
+1. Start Caddy server and obtain Let's Encrypt certificates
+2. Copy certificates from Caddy's data directory to expected locations
+3. Download Let's Encrypt root certificates and create a Java truststore
+4. Convert PEM certificates to Java keystore format (JKS and PKCS12)
+
+#### Certificate Renewal
+
+While Caddy automatically renews Let's Encrypt certificates (typically every 60-90 days), the copied certificates and Java keystores must be updated when renewals occur. The `update-certificates` task runs both `copy-caddy-certificates` and `convert-letsencrypt-to-java-stores`, which are idempotent and will only update if Caddy's certificates are newer:
+
+```bash
+task update-certificates
 ```
 
 ### Deploy Infrastructure

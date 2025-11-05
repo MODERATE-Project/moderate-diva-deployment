@@ -91,6 +91,16 @@ echo "Selected certificate files:"
 echo "Certificate: $CRT_FILE"
 echo "Private key: $KEY_FILE"
 
+# Check if update is needed (if target files exist and are newer, skip update)
+if [ -f "$SERVER_CRT" ] && [ -f "$SERVER_KEY" ]; then
+    if [ "$CRT_FILE" -nt "$SERVER_CRT" ] || [ "$KEY_FILE" -nt "$SERVER_KEY" ]; then
+        echo "Caddy certificates are newer - update needed"
+    else
+        echo "Certificates are up to date - no update needed"
+        exit 0
+    fi
+fi
+
 # Copy certificates to the target directory
 # If the target files exist, remove them first
 [ -f "$SERVER_CRT" ] && rm "$SERVER_CRT"
@@ -106,5 +116,3 @@ cp "$KEY_FILE" "$SERVER_KEY"
 echo "SSL certificates copied successfully:"
 echo "Certificate: $CRT_FILE -> $SERVER_CRT"
 echo "Private key: $KEY_FILE -> $SERVER_KEY"
-echo ""
-echo "Note: Certificates are copied, not linked. Re-run this script after Caddy renews certificates."
