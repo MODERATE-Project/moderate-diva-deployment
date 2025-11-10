@@ -1,0 +1,84 @@
+# NiFi Ansible Playbook
+---
+- name: NiFi Deployment
+  hosts: localhost
+  become: false
+  vars_files:
+    - params.yml
+    - ../params.yml
+
+  tasks:
+    - name: Docker down for update
+      tags: never
+      community.docker.docker_compose_v2:
+        project_src: "{{ general_vars.digital_twin_folder }}/nifi/"
+        state: absent
+
+    - name: Create Code Directory
+      tags: always
+      ansible.builtin.file:
+        name: "{{ general_vars.digital_twin_folder }}/nifi"
+        state: directory
+
+    - name: Retrieve Apache NiFi composer from Gitlab
+      tags: always
+      ansible.builtin.git:
+        repo: "git@{{ general_vars.project_repo }}/nifi.git"
+        dest: "{{ general_vars.digital_twin_folder }}/nifi"
+        force: true
+        accept_hostkey: yes
+        key_file: "{{ auth_key }}"
+
+    - name: Create Apache NiFi folders structure
+      tags: always
+      ansible.builtin.file:
+        path: "{{ general_vars.digital_twin_folder }}/nifi/{{ item }}"
+        state: directory
+        owner: "1000"
+        group: "1000"
+        mode: "0755"
+        recurse: yes
+      loop:
+        - "nifi/database_repository"
+        - "nifi/flowfile_repository"
+        - "nifi/content_repository"
+        - "nifi/provenance_repository"
+        - "nifi/lib"
+        - "nifi/python_extensions"
+        - "nifi/work"
+        - "nifi/nar_extensions"
+        - "nifi/state"
+        - "nifi/logs"
+
+    - name: Fill in Apache NiFi configuration files
+      tags: always
+      ansible.builtin.replace:
+        path: "{{ general_vars.digital_twin_folder }}/nifi/{{ item[0] }}"
+        regexp: "(?i:{{ item[1].key }})" # ignore case, match upper and lower without distinction
+        replace: "{{ item[1].value }}"
+      with_nested:
+        - "{{ files_to_fill }}" #for every file in this variable
+        - "{{ nifi_cred | dict2items + general_vars | dict2items }}" # for every string in these variables
+
+    - name: Launch Apache NiFi Docker container
+      tags: always
+      community.docker.docker_compose_v2:
+        project_src: "{{ general_vars.digital_twin_folder }}/nifi/"
+        state: present
+
+    - name: Pause for 30 seconds
+      tags: always
+      ansible.builtin.pause:
+        seconds: 30
+
+    - name: Run post-start command inside the container to add NiFi configuration
+      tags: always
+      community.docker.docker_container_exec:
+        container: "{{ general_vars.project_name }}-nifi-1"
+        command: cp -a /tmp/nifi.properties /opt/nifi/nifi-current/conf/nifi.properties
+
+    - name: Restart Apache NiFi container
+      tags: always
+      community.docker.docker_container:
+        name: "{{ general_vars.project_name }}-nifi-1"
+        restart: true

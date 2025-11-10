@@ -1,0 +1,60 @@
+# Quality Reporter Ansible Playbook
+---
+
+- name: Quality Reporter Deployment
+  hosts: localhost
+  become: false
+  vars_files:
+    - params.yml
+    - ../params.yml
+
+  tasks:
+
+  - name: Docker down for update
+    tags: never
+    community.docker.docker_compose_v2:
+      project_src: "{{ general_vars.digital_twin_folder }}/quality_reporter/"
+      state: absent
+
+  - name: Create Code Directory
+    tags: always
+    ansible.builtin.file:
+      name: "{{ general_vars.digital_twin_folder }}/quality_reporter"
+      state: directory
+
+  - name: Retrieve Quality Reporter composer from Gitlab
+    tags: always
+    ansible.builtin.git:
+      repo: 'git@{{ general_vars.project_repo }}/data-quality-reporter.git'
+      dest: "{{ general_vars.digital_twin_folder }}/quality_reporter"
+      force: true
+      accept_hostkey: yes
+      key_file: "{{ auth_key }}"
+
+  - name: Create Quality Reporter folders structure
+    tags: always
+    ansible.builtin.file:
+      path: "{{ general_vars.digital_twin_folder }}/quality_reporter/{{ item }}"
+      state: directory
+      owner: "1000"
+      group: "1000"
+      mode: '0755'
+      recurse: yes
+    loop:
+      - "reporter_data"
+
+  - name: Fill in Quality Reporter configuration files
+    tags: always
+    ansible.builtin.replace:
+      path: "{{ general_vars.digital_twin_folder }}/quality_reporter/{{ item[0] }}"
+      regexp: "(?i:{{ item[1].key }})" # ignore case, match upper and lower without distinction
+      replace: "{{ item[1].value }}"
+    with_nested:
+      - "{{ files_to_fill }}" #for every file in this variable
+      - "{{ kafka_conf | dict2items + grafana_conf | dict2items  + general_vars | dict2items }}" # for every string in these variables
+
+  - name: Launch Quality Reporter Docker container
+    tags: always
+    community.docker.docker_compose_v2:
+      project_src: "{{ general_vars.digital_twin_folder }}/quality_reporter/"
+      state: present

@@ -2,7 +2,6 @@ version: "3"
 
 vars:
   IMAGE_REGISTRY_URL: gitlab.linksfoundation.com:5050
-  GIT_URL_ANSIBLE_CONFIGURATOR: git@gitlab.linksfoundation.com:csc/csc-projects/moderate/ansible-configurator.git
   GIT_URL_KAFKA_SETUP: git@gitlab.linksfoundation.com:csc/csc-projects/moderate/kafka.git
   GIT_URL_KEYCLOAK_SETUP: git@gitlab.linksfoundation.com:csc/csc-projects/moderate/keycloak.git
   GIT_URL_NIFI_SETUP: git@gitlab.linksfoundation.com:csc/csc-projects/moderate/nifi.git
@@ -57,35 +56,13 @@ tasks:
     deps:
       - check-dependencies
     cmds:
-      - task: clone
       - task: login-registry
 
-  clone-ansible-configurator:
-    desc: "Clone the ansible-configurator repository and apply NiFi fix (idempotent - clones if missing, pulls if exists)"
-    cmds:
-      - |
-        if [ -d {{.ROOT_DIR}}/{{.ANSIBLE_CONFIGURATOR_DIR}}/.git ]; then
-          cd {{.ROOT_DIR}}/{{.ANSIBLE_CONFIGURATOR_DIR}} && git pull
-        else
-          git clone {{.GIT_URL_ANSIBLE_CONFIGURATOR}} {{.ROOT_DIR}}/{{.ANSIBLE_CONFIGURATOR_DIR}}
-        fi
-      - >
-        cp {{.ROOT_DIR}}/overrides/nifi-ansible-plb.yml
-        {{.ROOT_DIR}}/{{.ANSIBLE_CONFIGURATOR_DIR}}/NiFi/ansible-plb.yml
-    status:
-      - test -d {{.ROOT_DIR}}/{{.ANSIBLE_CONFIGURATOR_DIR}}/.git
-
-  clone:
-    desc: "Clone all required repositories"
-    cmds:
-      - task: clone-ansible-configurator
-
   update-repos:
-    desc: "Pull latest changes from all Git repositories (requires ansible-configurator to be cloned)"
+    desc: "Pull latest changes from all Git repositories"
     preconditions:
-      - test -d {{.ROOT_DIR}}/{{.ANSIBLE_CONFIGURATOR_DIR}}/.git
+      - test -d {{.ROOT_DIR}}/{{.ANSIBLE_CONFIGURATOR_DIR}}
     cmds:
-      - cd {{.ROOT_DIR}}/{{.ANSIBLE_CONFIGURATOR_DIR}} && git pull
       - >
         cp {{.ROOT_DIR}}/overrides/nifi-ansible-plb.yml
         {{.ROOT_DIR}}/{{.ANSIBLE_CONFIGURATOR_DIR}}/NiFi/ansible-plb.yml

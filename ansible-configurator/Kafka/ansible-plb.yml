@@ -1,0 +1,48 @@
+# Kafka Ansible playbook
+---
+
+- name: Kafka Deployment
+  hosts: localhost
+  become: false
+  vars_files:
+    - params.yml
+    - ../params.yml
+  
+  tasks:
+
+  - name: Docker down for update
+    tags: never
+    community.docker.docker_compose_v2:
+      project_src: "{{ general_vars.digital_twin_folder }}/kafka/"
+      state: absent
+
+  - name: Create Code Directory
+    tags: always
+    ansible.builtin.file:
+      name: "{{ general_vars.digital_twin_folder }}/kafka"
+      state: directory
+
+  - name: Retrieve Kafka composer from Gitlab
+    tags: always
+    ansible.builtin.git:
+      repo: 'git@{{ general_vars.project_repo }}/kafka.git'
+      dest: "{{ general_vars.digital_twin_folder }}/kafka"
+      force: true
+      accept_hostkey: yes
+      key_file: "{{ auth_key }}"
+    
+  - name: Fill In kafka Configuration Files
+    tags: always
+    ansible.builtin.replace:
+      path: "{{ general_vars.digital_twin_folder }}/kafka/{{ item[0] }}"
+      regexp: "(?i:{{ item[1].key }})" # ignore case, match upper and lower without distinction
+      replace: "{{ item[1].value }}"
+    with_nested:
+      - "{{ files_to_fill }}" #for every file in this variable
+      - "{{ kafka_cred | dict2items + general_vars | dict2items }}" # for every string in these variables
+
+  - name: Launch Kafka Docker container
+    tags: always
+    community.docker.docker_compose_v2:
+      project_src: "{{ general_vars.digital_twin_folder }}/kafka/"
+      state: present

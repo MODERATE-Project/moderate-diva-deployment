@@ -1,0 +1,72 @@
+# NiFi Processors Ansible Playbook
+---
+
+- name: NiFi Processors Deployment
+  hosts: localhost
+  become: false
+  vars_files:
+    - ../params.yml
+    - params.yml
+
+  tasks:
+
+  - name: Retrieve DQA Validator from Gitlab
+    ansible.builtin.git:
+      repo: 'git@{{ general_vars.project_repo }}/nifi-processors/dqa-validator.git'
+      dest: "./git_tmp"
+      force: true
+      accept_hostkey: yes
+      key_file: "{{ auth_key }}"
+
+  - name: Move DQA Validator Files
+    ansible.builtin.copy:
+      src: "{{ item }}"
+      dest: "{{ general_vars.digital_twin_folder }}/nifi/nifi/python_extensions/"
+    with_fileglob: "git_tmp/*py"
+
+  - name: Retrieve Schema Validator from Gitlab
+    ansible.builtin.git:
+      repo: 'git@{{ general_vars.project_repo }}/nifi-processors/schema-validator.git'
+      dest: "./git_tmp"
+      force: true
+      accept_hostkey: yes
+      key_file: "{{ auth_key }}"
+
+  - name: Move Schema Validator Files
+    ansible.builtin.copy:
+      src: "{{ item }}"
+      dest: "{{ general_vars.digital_twin_folder }}/nifi/nifi/python_extensions/"
+    with_fileglob: "git_tmp/*py"
+
+  - name: Retrieve Encapsulator from Gitlab
+    ansible.builtin.git:
+      repo: 'git@{{ general_vars.project_repo }}/nifi-processors/unified-data-model-encapsulator.git'
+      dest: "./git_tmp"
+      force: true
+      accept_hostkey: yes
+      key_file: "{{ auth_key }}"
+
+  - name: Move Encapsulator Files
+    ansible.builtin.copy:
+      src: "{{ item }}"
+      dest: "{{ general_vars.digital_twin_folder }}/nifi/nifi/python_extensions/"
+    with_fileglob: "git_tmp/*py"
+
+  - name: Remove __init__ file
+    ansible.builtin.file:
+      path: ./__init__.py
+      state: absent
+
+  - name: Fill in Apache NiFi configuration files
+    ansible.builtin.replace:
+      path: "{{ general_vars.digital_twin_folder }}/nifi/nifi/python_extensions/{{ item[0] }}"
+      regexp: "(?i:{{ item[1].key }})" # ignore case, match upper and lower without distinction
+      replace: "{{ item[1].value }}"
+    with_nested:
+      - "{{ files_to_fill }}" #for every file in this variable
+      - "{{ general_vars | dict2items }}" # for every string in this variable
+
+  - name: Restart Apache NiFi container
+    community.docker.docker_container:
+      name: "{{ general_vars.project_name }}-nifi-1"
+      restart: true

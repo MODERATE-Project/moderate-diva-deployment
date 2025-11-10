@@ -1,0 +1,29 @@
+# General Digital Twin Playbook 
+---
+
+- name: Install Dependencies
+  hosts: localhost
+  become: true
+  vars_files:
+    - params.yml
+
+  tasks:
+
+  - name: Install KeyTool
+    ansible.builtin.apt:
+      name: default-jre
+      state: present
+
+# import DT components playbooks
+
+- name: Import Kafka
+  ansible.builtin.import_playbook: Kafka/ansible-plb.yml
+
+- name: Import NiFi
+  ansible.builtin.import_playbook: NiFi/ansible-plb.yml
+
+- name: Import NiFi Processors
+  ansible.builtin.import_playbook: NiFi_Processors/ansible-plb.yml
+
+- name: Import Data Quality Reporter
+  ansible.builtin.import_playbook: Quality_Reporter/ansible-plb.yml

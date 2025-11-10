@@ -1,7 +1,6 @@
 ## Misc
 #######
 
-ansible-configurator/
 certificates/
 .env
 kafka-setup/
@@ -14,6 +13,7 @@ config/docker-compose-*.yml
 caddy/*
 !caddy/.gitkeep
 !caddy/Caddyfile
+.claude
 
 ## Linux
 ########
