@@ -79,3 +79,111 @@ This section involves manual configuration of OAuth clients in Keycloak for secu
 4. Copy client secrets to `.env` file (`KAFKA_KEYCLOAK_SECRET`, `NIFI_KEYCLOAK_SECRET`, `GRAFANA_KEYCLOAK_SECRET`)
 5. Run `task process-configuration-templates` in separate terminal
 6. Confirm Ansible prompt to continue
+
+## Updating Vendored Repositories
+
+This repository vendors several upstream projects so deployments remain self-contained. Use this workflow whenever you need to pull in upstream changes.
+
+### Prerequisites
+
+- SSH access to `gitlab.linksfoundation.com`
+- `git` installed locally
+- Write access to this repository
+
+### Repository Layout
+
+```
+moderate-diva-deployment/
+├── kafka/                                          # Kafka setup
+├── nifi/                                           # NiFi setup
+├── quality_reporter/                               # Quality Reporter setup
+└── ansible-configurator/NiFi_Processors/vendored/  # NiFi processors
+    ├── dqa-validator/
+    ├── schema-validator/
+    └── unified-data-model-encapsulator/
+```
+
+### Update Workflow
+
+1. From the repository root (`/home/agmangas/moderate-diva-deployment`), create a temporary workspace: `mkdir -p .tmp-updates && cd .tmp-updates`.
+2. Clone the desired upstream repository (Kafka, NiFi, Quality Reporter, or a NiFi processor) from GitLab.
+3. Remove the upstream `.git` directory so the code becomes a vendored copy: `rm -rf <repo>/.git`.
+4. Replace the existing vendored directory:
+   - Kafka / NiFi / Quality Reporter: `rm -rf ../<repo>` then `mv <repo> ..`.
+   - NiFi processors: `rm -rf ../ansible-configurator/NiFi_Processors/vendored/<processor>` then `mv <processor> ../ansible-configurator/NiFi_Processors/vendored/`.
+5. Return to the repository root and remove the temporary workspace: `cd .. && rm -rf .tmp-updates`.
+
+Tip: back up the previous vendored directory before replacing it if you expect to compare or restore changes.
+
+### Test the Update
+
+After refreshing any vendored component, run:
+
+```bash
+task process-configuration-templates
+task deploy
+```
+
+Verify the deployment and service logs before committing.
+
+### Commit the Changes
+
+Stage only the updated vendored paths, then create a concise commit describing which components were refreshed:
+
+```bash
+git add kafka/ nifi/ quality_reporter/ ansible-configurator/NiFi_Processors/vendored/
+git commit -m "<updated components>"
+```
+
+### Track Upstream Versions
+
+Before removing the upstream `.git` directory, capture the source commit hash for reference:
+
+```bash
+git log -1 --format="%H %ai %s" > ../../vendored-<component>-version.txt
+```
+
+Aggregate these references in `VENDORED_VERSIONS.md` (create the file if it does not exist) so you always know which upstream revisions are deployed.
+
+### Custom Patches
+
+Apply any local modifications directly to the vendored files, describe them in a `PATCHES.md`, and commit the updates together with the refreshed sources.
+
+### Troubleshooting
+
+- `task update-repos` now points to this manual flow; seeing that message is expected.
+- If deployment fails, verify that all vendored directories were replaced correctly and that no `.git` folders remain.
+- Re-run `task process-configuration-templates` to ensure Ansible receives up-to-date parameters.
+- Inspect Ansible logs for detailed failure messages.
+
+### Optional Update Script
+
+Automate the workflow with a helper script such as:
+
+```bash
+#!/bin/bash
+# update-vendored-repo.sh
+REPO_NAME=$1
+GITLAB_REPO_PATH=$2
+LOCAL_PATH=$3
+
+if [ -z "$REPO_NAME" ] || [ -z "$GITLAB_REPO_PATH" ] || [ -z "$LOCAL_PATH" ]; then
+  echo "Usage: $0 <repo-name> <gitlab-path> <local-path>"
+  exit 1
+fi
+
+mkdir -p .tmp-updates
+cd .tmp-updates
+
+git clone "$GITLAB_REPO_PATH" "$REPO_NAME"
+rm -rf "$REPO_NAME/.git"
+
+cd ..
+[ -d "$LOCAL_PATH" ] && mv "$LOCAL_PATH" "${LOCAL_PATH}.backup"
+mv ".tmp-updates/$REPO_NAME" "$LOCAL_PATH"
+rm -rf .tmp-updates
+
+echo "$REPO_NAME updated. Previous version backed up to ${LOCAL_PATH}.backup"
+```
+
+Make the script executable (`chmod +x update-vendored-repo.sh`) and run it from the repository root when you need a repeatable update process.

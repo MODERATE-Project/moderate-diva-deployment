@@ -1,0 +1,11 @@
+services:
+  test-data-streamer:
+    build: .
+    image: test-data-streamer-image:latest
+    environment:
+      - MQTT_BROKER_ADDRESS=machine_url
+      - MQTT_PORT=8883
+      - MQTT_TOPIC=project_name/test
+      - MQTT_USERNAME=links
+      - MQTT_PASSWORD=links
+      - MESSAGE_INTERVAL=1

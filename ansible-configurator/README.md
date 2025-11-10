@@ -39,9 +39,10 @@ Run the ansible playbook with the parameter: `--tags never`. It will `docker com
 **Step 1: Configure Keycloak URL**
 
 In the main `params.yml`, set the Keycloak URL:
+
 ```yaml
 general_vars:
-  keycloak_url: https://keycloak.yourdomain.com  # Replace PLCHLD_KCK
+  keycloak_url: https://keycloak.yourdomain.com # Replace PLCHLD_KCK
 ```
 
 **Step 2: Create Realm and OAuth Clients in Keycloak**
@@ -55,6 +56,7 @@ Manually configure Keycloak via its admin UI:
    - **Grafana Client** - for Grafana authentication
 
 For each client, note down:
+
 - Client ID
 - Client Secret
 
@@ -63,23 +65,25 @@ For each client, note down:
 Add the client credentials to their respective `params.yml` files:
 
 - **Kafka** (`Kafka/params.yml`):
+
   ```yaml
   kafka_cred:
-    kafka_kck_id: your-kafka-client-id      # Replace PLCHLD_KK_ID
+    kafka_kck_id: your-kafka-client-id # Replace PLCHLD_KK_ID
     kafka_kck_scr: your-kafka-client-secret # Replace PLCHLD_KK_SCR
   ```
 
 - **NiFi** (`NiFi/params.yml`):
+
   ```yaml
   nifi_cred:
-    nifi_kck_id: your-nifi-client-id        # Replace PLCHLD_NK_ID
-    nifi_kck_scr: your-nifi-client-secret   # Replace PLCHLD_NK_SCR
+    nifi_kck_id: your-nifi-client-id # Replace PLCHLD_NK_ID
+    nifi_kck_scr: your-nifi-client-secret # Replace PLCHLD_NK_SCR
   ```
 
 - **Grafana** (`Quality_Reporter/params.yml`):
   ```yaml
   grafana_conf:
-    graf_kck_id: your-grafana-client-id     # Replace PLCHLD_KG_ID
+    graf_kck_id: your-grafana-client-id # Replace PLCHLD_KG_ID
     graf_kck_scr: your-grafana-client-secret # Replace PLCHLD_KG_PSW
   ```
 
@@ -112,12 +116,14 @@ After completing the above steps, run the playbooks. The configurator will injec
 > **Note**: Keycloak deployment is NOT handled by this configurator. The parameters below are for reference only if you're deploying Keycloak separately.
 
 **For Keycloak deployment (external):**
+
 - `keyck_user`: the admin user for Keycloak
 - `keyck_psw`: the password for Keycloak admin user
 - `keyck_db_user`: the user of Keycloak's PostgreSQL database
 - `keyck_db_psw`: the password for Keycloak's PostgreSQL database
 
 **For component integration (configured by this tool):**
+
 - `keycloak_url`: URL of the Keycloak instance (set in main `params.yml`)
 - Component-specific client IDs and secrets (see [Keycloak Configuration](#keycloak) section)
 
@@ -133,7 +139,7 @@ After completing the above steps, run the playbooks. The configurator will injec
 
 - `files_to_fill`: dotted list of the files where the variables need to be replaced
 - `nifi_vers`: the deployed version of NiFi
-- `proc_vers_vars`: the version of the AMQP processor 
+- `proc_vers_vars`: the version of the AMQP processor
 
 ### Quality Reporter
 

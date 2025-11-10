@@ -1,0 +1,73 @@
+variables:
+  # Configure these variables in your GitLab project settings
+  # The URL should NOT include the token - we'll add it in the script
+  MIRROR_REPO_URL: ${MIRROR_REPO_URL} # URL to repository
+  MIRROR_TOKEN: ${MIRROR_TOKEN} # Your access token with write permissions
+  TARGET_BRANCH: ${MIRROR_REPO_BRANCH} # Change this to your target branch name
+  MIRROR_TAG: "[ci-mirror]" # Tag to mark mirrored commits
+
+# Use a recent git version to ensure compatibility
+image: alpine:latest
+
+before_script:
+  # Install git
+  - apk add --no-cache git
+  - git config --global user.name "GitLab CI/CD"
+  - git config --global user.email "gitlab-ci@example.com"
+
+mirror-repository:
+  stage: deploy
+  script:
+    # Clean up any existing remotes or branches from previous runs
+    - git remote remove mirror || true
+    - git branch -D temp-mirror-branch || true
+
+    # Fetch all history and tags
+    - git fetch --unshallow origin || true
+    - git fetch --tags origin
+
+    # Store the original commit message and add our mirror tag
+    - COMMIT_MSG=$(git log -1 --pretty=%B)
+    - TAGGED_MSG="$COMMIT_MSG $MIRROR_TAG"
+
+    # Create a temporary branch without .gitlab-ci.yml
+    - git checkout -b temp-mirror-branch
+    - git rm .gitlab-ci.yml
+    - git commit -m "$COMMIT_MSG"
+
+    # Construct the URL with token
+    - REPO_URL_WITH_TOKEN="https://oauth2:${MIRROR_TOKEN}@${MIRROR_REPO_URL}"
+
+    # Add mirror repository as a remote
+    - git remote add mirror $REPO_URL_WITH_TOKEN
+    - git fetch mirror
+
+    # Push to mirror repository without .gitlab-ci.yml
+    - |
+      if git push mirror temp-mirror-branch:$TARGET_BRANCH --force; then
+        echo "Successfully mirrored to $TARGET_BRANCH"
+      else
+        echo "Failed to mirror repository"
+        exit 1
+      fi
+
+    # Clean up
+    - git checkout -
+    - git branch -D temp-mirror-branch
+    - git remote remove mirror
+
+  rules:
+    # Don't run if commit message contains our mirror tag
+    - if: $CI_COMMIT_MESSAGE =~ /\[ci-mirror\]/
+      when: never
+    # Run for all other branch commits
+    - if: $CI_COMMIT_BRANCH
+      when: always
+
+  # Retry on network issues
+  retry:
+    max: 2
+    when:
+      - runner_system_failure
+      - stuck_or_timeout_failure
+      - unknown_failure

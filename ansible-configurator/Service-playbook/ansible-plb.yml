@@ -1,6 +1,5 @@
 # Service Ansible playbook 1
 ---
-
 - name: Interruption for manually completion
   hosts: localhost
   become: false
@@ -11,23 +10,25 @@
 
   vars_prompt:
     - name: continue_1
-      prompt: "After Keycloak deployment, you have to manually create a client for NiFi add to the params.yml of NiFi directory:\n
-              - client id (name)(nifi_kck_id)\n
-              - client secret (nifi_kck_scr)\n
-              DONE?"
+      prompt:
+        "After Keycloak deployment, you have to manually create a client for NiFi add to the params.yml of NiFi directory:\n
+        - client id (name)(nifi_kck_id)\n
+        - client secret (nifi_kck_scr)\n
+        DONE?"
       private: false
 
     - name: continue_2
-      prompt: "After Keycloak deployment, you have to manually create a client for Kafka and add to the params.yml of Kafka directory:\n
-              - client id (name)(kafka_kck_id)\n
-              - client secret (kafka_kck_scr)\n
-              DONE?"
+      prompt:
+        "After Keycloak deployment, you have to manually create a client for Kafka and add to the params.yml of Kafka directory:\n
+        - client id (name)(kafka_kck_id)\n
+        - client secret (kafka_kck_scr)\n
+        DONE?"
       private: false
 
   tasks:
     - name: Visual check
       debug:
-        msg: 
+        msg:
           - "Nifi Client ID: {{ nifi_cred.nifi_kck_id }}"
           - "Nifi Client Secret {{ nifi_cred.nifi_kck_scr }}"
           - "Kafka Client ID: {{ kafka_cred.kafka_kck_id }}"

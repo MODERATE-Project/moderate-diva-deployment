@@ -2,9 +2,6 @@ version: "3"
 
 vars:
   IMAGE_REGISTRY_URL: gitlab.linksfoundation.com:5050
-  GIT_URL_KAFKA_SETUP: git@gitlab.linksfoundation.com:csc/csc-projects/moderate/kafka.git
-  GIT_URL_KEYCLOAK_SETUP: git@gitlab.linksfoundation.com:csc/csc-projects/moderate/keycloak.git
-  GIT_URL_NIFI_SETUP: git@gitlab.linksfoundation.com:csc/csc-projects/moderate/nifi.git
   ANSIBLE_CONFIGURATOR_DIR: ansible-configurator
   KAFKA_SETUP_DIR: kafka
   KEYCLOAK_SETUP_DIR: keycloak
@@ -76,32 +73,18 @@ tasks:
   # =================================================================
 
   setup:
-    desc: "Set up the deployment environment by cloning repositories and logging into registry"
+    desc: "Set up the deployment environment by logging into registry"
     deps:
       - check-dependencies
     cmds:
       - task: login-registry
 
   update-repos:
-    desc: "Pull latest changes from all Git repositories"
-    preconditions:
-      - test -d {{.ROOT_DIR}}/{{.ANSIBLE_CONFIGURATOR_DIR}}
+    desc: "Update vendored repositories (see UPDATING_VENDORED_REPOS.md for instructions)"
     cmds:
-      - >
-        cp {{.ROOT_DIR}}/overrides/nifi-ansible-plb.yml
-        {{.ROOT_DIR}}/{{.ANSIBLE_CONFIGURATOR_DIR}}/NiFi/ansible-plb.yml
-      - |
-        if [ -d {{.ROOT_DIR}}/{{.KAFKA_SETUP_DIR}}/.git ]; then
-          cd {{.ROOT_DIR}}/{{.KAFKA_SETUP_DIR}} && git pull
-        fi
-      - |
-        if [ -d {{.ROOT_DIR}}/{{.KEYCLOAK_SETUP_DIR}}/.git ]; then
-          cd {{.ROOT_DIR}}/{{.KEYCLOAK_SETUP_DIR}} && git pull
-        fi
-      - |
-        if [ -d {{.ROOT_DIR}}/{{.NIFI_SETUP_DIR}}/.git ]; then
-          cd {{.ROOT_DIR}}/{{.NIFI_SETUP_DIR}} && git pull
-        fi
+      - echo "Repositories are now vendored in this codebase."
+      - echo "To update them, see UPDATING_VENDORED_REPOS.md for manual update instructions."
+      - exit 1
 
   login-registry:
     desc: "Log into the Docker registry to access private images"
@@ -249,7 +232,7 @@ tasks:
   # =================================================================
 
   clean:
-    desc: "Remove all generated files and cloned repositories"
+    desc: "Stop all Docker services and remove generated files (preserves vendored repositories)"
     cmds:
       - task: stop-caddy
       - cmd: cd {{.ROOT_DIR}}/{{.KAFKA_SETUP_DIR}} && docker compose down
@@ -260,9 +243,7 @@ tasks:
         ignore_error: true
       - cmd: cd {{.ROOT_DIR}}/{{.QUALITY_REPORTER_SETUP_DIR}} && docker compose down
         ignore_error: true
-      - rm -rf {{.ROOT_DIR}}/{{.KAFKA_SETUP_DIR}}
       - rm -rf {{.ROOT_DIR}}/{{.KEYCLOAK_SETUP_DIR}}
-      - rm -rf {{.ROOT_DIR}}/{{.NIFI_SETUP_DIR}}
-      - rm -rf {{.ROOT_DIR}}/{{.QUALITY_REPORTER_SETUP_DIR}}
-      - rm -rf {{.ROOT_DIR}}/{{.ANSIBLE_CONFIGURATOR_DIR}}
       - rm -rf {{.ROOT_DIR}}/{{.CERT_DIR}}
+      - echo "Note: Vendored repositories (kafka/, nifi/, quality_reporter/) are preserved."
+      - echo "Generated Ansible parameter files in ansible-configurator/ are preserved."

@@ -1,6 +1,5 @@
-# General Digital Twin Playbook 
+# General Digital Twin Playbook
 ---
-
 - name: Install Dependencies
   hosts: localhost
   become: true
@@ -8,11 +7,10 @@
     - params.yml
 
   tasks:
-
-  - name: Install KeyTool
-    ansible.builtin.apt:
-      name: default-jre
-      state: present
+    - name: Install KeyTool
+      ansible.builtin.apt:
+        name: default-jre
+        state: present
 
 # import DT components playbooks
 

@@ -14,20 +14,12 @@
         project_src: "{{ general_vars.digital_twin_folder }}/nifi/"
         state: absent
 
-    - name: Create Code Directory
+    - name: Verify NiFi directory exists (vendored in repository)
       tags: always
-      ansible.builtin.file:
-        name: "{{ general_vars.digital_twin_folder }}/nifi"
-        state: directory
-
-    - name: Retrieve Apache NiFi composer from Gitlab
-      tags: always
-      ansible.builtin.git:
-        repo: "git@{{ general_vars.project_repo }}/nifi.git"
-        dest: "{{ general_vars.digital_twin_folder }}/nifi"
-        force: true
-        accept_hostkey: yes
-        key_file: "{{ auth_key }}"
+      ansible.builtin.stat:
+        path: "{{ general_vars.digital_twin_folder }}/nifi"
+      register: nifi_dir
+      failed_when: not nifi_dir.stat.exists or not nifi_dir.stat.isdir
 
     - name: Create Apache NiFi folders structure
       tags: always

@@ -3,12 +3,7 @@
 
 certificates/
 .env
-kafka-setup/
-keycloak-setup/
-nifi-setup/
-kafka/
 keycloak/
-nifi/
 config/docker-compose-*.yml
 caddy/*
 !caddy/.gitkeep
@@ -22,6 +17,9 @@ ansible-configurator/NiFi/params.yml
 ansible-configurator/NiFi_Processors/params.yml
 ansible-configurator/Quality_Reporter/params.yml
 ansible-configurator/Service-playbook/params.yml
+
+# Temporary directory for NiFi Processors (no longer used with vendored approach)
+ansible-configurator/NiFi_Processors/git_tmp/
 
 ## Linux
 ########
