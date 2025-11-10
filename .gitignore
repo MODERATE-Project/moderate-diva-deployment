@@ -21,6 +21,9 @@ ansible-configurator/Service-playbook/params.yml
 # Temporary directory for NiFi Processors (no longer used with vendored approach)
 ansible-configurator/NiFi_Processors/git_tmp/
 
+# Quality Reporter data
+quality_reporter/reporter_data
+
 ## Linux
 ########
 
