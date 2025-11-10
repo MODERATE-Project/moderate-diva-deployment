@@ -20,6 +20,7 @@ vars:
   LETSENCRYPT_X1_URL: "https://letsencrypt.org/certs/isrgrootx1.pem"
   LETSENCRYPT_R3_URL: "https://letsencrypt.org/certs/lets-encrypt-r3.pem"
   CADDY_COMPOSE_FILE: "{{.ROOT_DIR}}/docker-compose-caddy.yml"
+  SERVICES_NETWORK: "{{.PROJECT_NAME}}-network"
 
 dotenv:
   - .env
@@ -46,6 +47,29 @@ tasks:
       - ansible --version
       - envsubst --help
       - keytool --help
+
+  create-services-network:
+    desc: "Create shared Docker network for services"
+    cmds:
+      - docker network create {{.SERVICES_NETWORK}}
+    status:
+      - docker network inspect {{.SERVICES_NETWORK}} > /dev/null 2>&1
+
+  # =================================================================
+  # Keycloak Setup
+  # =================================================================
+
+  start-keycloak:
+    desc: "Start Keycloak server"
+    deps:
+      - create-services-network
+    cmds:
+      - docker compose -f {{.ROOT_DIR}}/docker-compose-keycloak.yml up -d --wait
+
+  stop-keycloak:
+    desc: "Stop Keycloak server"
+    cmds:
+      - docker compose -f {{.ROOT_DIR}}/docker-compose-keycloak.yml down
 
   # =================================================================
   # Setup & Environment
@@ -100,6 +124,7 @@ tasks:
     desc: "Start Caddy server for SSL certificate management"
     deps:
       - create-dirs
+      - create-services-network
     cmds:
       - docker compose -f {{.CADDY_COMPOSE_FILE}} up -d --wait
 

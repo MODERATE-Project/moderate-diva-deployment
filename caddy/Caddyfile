@@ -30,3 +30,14 @@ reporter.{$MACHINE_URL} {
 
 	reverse_proxy reporter:8000
 }
+
+keycloak.{$MACHINE_URL} {
+	tls {$LETSENCRYPT_EMAIL}
+
+	log {
+		output stdout
+		level INFO
+	}
+
+	reverse_proxy keycloak:8080
+}

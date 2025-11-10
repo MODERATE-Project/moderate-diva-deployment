@@ -8,6 +8,8 @@ services:
         UID: "${UID:-1000}"
         GID: "${GID:-1000}"
     restart: unless-stopped
+    networks:
+      - services-network
     volumes:
       - caddy_config:/config
       - ./caddy/data:/data
@@ -23,3 +25,7 @@ services:
       - 443:443
 volumes:
   caddy_config: {}
+networks:
+  services-network:
+    external: true
+    name: ${PROJECT_NAME}-network

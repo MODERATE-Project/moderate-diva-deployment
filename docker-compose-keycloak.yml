@@ -1,0 +1,63 @@
+name: ${PROJECT_NAME}-keycloak-dev
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: on-failure
+    networks:
+      - default
+    environment:
+      POSTGRES_USER: ${KEYCLOAK_DB_USER}
+      POSTGRES_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
+      POSTGRES_DB: ${KEYCLOAK_DB_NAME}
+    volumes:
+      - keycloak-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${KEYCLOAK_DB_USER} -d ${KEYCLOAK_DB_NAME}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.2
+    restart: on-failure
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - default
+      - services-network
+    ports:
+      - ${KEYCLOAK_HOST_PORT}:8080
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command:
+      - start-dev
+    environment:
+      # Keycloak admin credentials
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KEYCLOAK_USER}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_PASSWORD}
+      # Postgres database credentials
+      KC_DB: postgres
+      KC_DB_USERNAME: ${KEYCLOAK_DB_USER}
+      KC_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD}
+      KC_DB_URL_PORT: 5432
+      KC_DB_URL_DATABASE: ${KEYCLOAK_DB_NAME}
+      KC_DB_URL_HOST: postgres
+      # Logging configuration
+      KC_LOG_CONSOLE_COLOR: "true"
+      KC_LOG_LEVEL: debug
+      # Keycloak proxy configuration
+      KC_HOSTNAME_STRICT: false
+      KC_HOSTNAME_DEBUG: true
+      KC_HTTP_ENABLED: false
+      KC_HOSTNAME: https://keycloak.${MACHINE_URL}
+      KC_HOSTNAME_ADMIN: https://keycloak.${MACHINE_URL}
+volumes:
+  keycloak-postgres-data: {}
+networks:
+  services-network:
+    external: true
+    name: ${PROJECT_NAME}-network
