@@ -15,6 +15,14 @@ caddy/*
 !caddy/Caddyfile
 .claude
 
+# Generated parameter files (created from .tpl templates during deployment)
+ansible-configurator/params.yml
+ansible-configurator/Kafka/params.yml
+ansible-configurator/NiFi/params.yml
+ansible-configurator/NiFi_Processors/params.yml
+ansible-configurator/Quality_Reporter/params.yml
+ansible-configurator/Service-playbook/params.yml
+
 ## Linux
 ########
 

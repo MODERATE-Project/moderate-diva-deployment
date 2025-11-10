@@ -207,11 +207,9 @@ tasks:
   process-configuration-templates:
     desc: "Substitute placeholders in templates with environment variables and move them to the correct directory"
     deps:
-      - clone-ansible-configurator
       - validate-config
     cmds:
       - envsubst < {{.CONFIG_DIR}}/general.params.yml.tpl > {{.ANSIBLE_CONFIGURATOR_DIR}}/params.yml
-      - envsubst < {{.CONFIG_DIR}}/keycloak.params.yml.tpl > {{.ANSIBLE_CONFIGURATOR_DIR}}/Keycloak/params.yml
       - envsubst < {{.CONFIG_DIR}}/kafka.params.yml.tpl > {{.ANSIBLE_CONFIGURATOR_DIR}}/Kafka/params.yml
       - envsubst < {{.CONFIG_DIR}}/nifi.params.yml.tpl > {{.ANSIBLE_CONFIGURATOR_DIR}}/NiFi/params.yml
       - envsubst < {{.CONFIG_DIR}}/nifi_processors.params.yml.tpl > {{.ANSIBLE_CONFIGURATOR_DIR}}/NiFi_Processors/params.yml
