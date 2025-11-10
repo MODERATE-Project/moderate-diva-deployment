@@ -22,7 +22,8 @@ ansible-configurator/Service-playbook/params.yml
 ansible-configurator/NiFi_Processors/git_tmp/
 
 # Quality Reporter data
-quality_reporter/reporter_data
+quality_reporter/reporter_data/*
+!quality_reporter/reporter_data/.gitkeep
 
 ## Linux
 ########
