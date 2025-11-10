@@ -69,6 +69,8 @@ services:
       - "digital_twin_folder/certificates/ca.der:/usr/local/share/ca-certificates/csc.der:ro"
       - "./client.config:/etc/kafka/client.config:ro"
       - "kafka-data1:/var/lib/kafka/data"
+    networks:
+      - services-network
 
   # Schema Registry service
   schema-registry:
@@ -94,6 +96,8 @@ services:
     volumes:
       - "digital_twin_folder/certificates/keystore.jks:/bitnami/kafka/config/certs/kafka.keystore.jks:rw"
       - "digital_twin_folder/certificates/truststore.jks:/bitnami/kafka/config/certs/kafka.truststore.jks:rw"
+    networks:
+      - services-network
 
   # ksqlDB Server service
   ksqldb-server:
@@ -126,6 +130,8 @@ services:
     volumes:
       - "digital_twin_folder/certificates/keystore.jks:/etc/ksql/secrets/kafka.client.keystore.jks:ro"
       - "digital_twin_folder/certificates/truststore.jks:/etc/ksql/secrets/kafka.client.truststore.jks:ro"
+    networks:
+      - services-network
 
   # Kafka REST Proxy service
   rest-proxy:
@@ -153,6 +159,8 @@ services:
     volumes:
       - "digital_twin_folder/certificates/keystore.jks:/etc/kafka/secrets/kafka.keystore.jks:ro"
       - "digital_twin_folder/certificates/truststore.jks:/etc/kafka/secrets/kafka.truststore.jks:ro"
+    networks:
+      - services-network
 
   # Kafka UI service
   kafka-ui:
@@ -184,8 +192,15 @@ services:
       - "digital_twin_folder/certificates/truststore.jks:/certs/kafka.truststore.jks:ro"
       - "digital_twin_folder/certificates/keystore.jks:/certs/kafka.keystore.jks:ro"
       - "digital_twin_folder/certificates/ca.der:/usr/local/share/ca-certificates/csc.der:ro"
+    networks:
+      - services-network
 
 # Define named volumes
 volumes:
   kafka-data1:
     driver: local
+
+networks:
+  services-network:
+    external: true
+    name: project_name-network
