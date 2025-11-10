@@ -2,16 +2,19 @@
 
 This repository contains deployment configurations and automation scripts for the MODERATE Data Integrity and Validation Architecture. The deployment includes Apache Kafka for data streaming, Keycloak for identity and access management, Apache NiFi for data processing workflows, and supporting infrastructure components. The deployment is orchestrated using Docker Compose and Ansible, with configuration templates for environment-specific parameters.
 
+> [!NOTE]
+> Upstream Git repositories that were previously cloned during deployment are now vendored into this repository (e.g., `ansible-configurator` and NiFi processors) to ensure reproducible deployments. No cloning occurs at deploy time; see "Updating Vendored Repositories" below for how to refresh them.
+
 ## Prerequisites
 
-* Docker
-* Docker Compose
-* Ansible
-* Python 3
-* OpenSSL
-* `keytool`
-* `envsubst`
-* [Taskfile](https://taskfile.dev)
+- Docker
+- Docker Compose
+- Ansible
+- Python 3
+- OpenSSL
+- `keytool`
+- `envsubst`
+- [Taskfile](https://taskfile.dev)
 
 ## Deployment Guide
 
@@ -27,7 +30,7 @@ task validate-config
 
 ### Initial Setup
 
-The `setup` task prepares the deployment environment by performing dependency checks and repository management. It verifies that all required tools (Docker, Ansible, Python, keytool, etc.) are installed and accessible, clones the necessary repositories (including the ansible-configurator), and authenticates with the Docker registry to access private images.
+The `setup` task prepares the deployment environment by verifying required tools (Docker, Ansible, Python, `keytool`, etc.) and logging into the Docker registry to access private images. All code required for deployment is already vendored in this repository; no repositories are cloned during setup.
 
 ```bash
 task setup
@@ -35,7 +38,7 @@ task setup
 
 ### SSL Certificates
 
-This section handles SSL certificate management for secure communication across all services. Caddy automatically obtains and renews Let's Encrypt certificates, but the certificates must be copied and converted to Java keystore formats for use by Kafka, NiFi, and other Java-based services.
+This section handles SSL certificate management for secure communication across services. Caddy automatically obtains and renews Let's Encrypt certificates for the root domain and subdomains defined in `caddy/Caddyfile` (e.g., `keycloak.$MACHINE_URL`, `grafana.$MACHINE_URL`, `reporter.$MACHINE_URL`). The certificates must then be copied and converted to Java keystore formats for Kafka, NiFi, and other Java-based services.
 
 #### Initial Certificate Setup
 
@@ -48,6 +51,7 @@ task convert-letsencrypt-to-java-stores
 ```
 
 This will:
+
 1. Start Caddy server and obtain Let's Encrypt certificates
 2. Copy certificates from Caddy's data directory to expected locations
 3. Download Let's Encrypt root certificates and create a Java truststore
@@ -61,24 +65,43 @@ While Caddy automatically renews Let's Encrypt certificates (typically every 60-
 task update-certificates
 ```
 
+### Keycloak Deployment (Run First)
+
+Deploy and configure Keycloak before the rest of the stack so OAuth client credentials are available to other services.
+
+```bash
+task start-keycloak
+```
+
+Access Keycloak at `https://keycloak.<MACHINE_URL>` (Caddy terminates TLS and reverse-proxies to Keycloak). Log in with `KEYCLOAK_USER` / `KEYCLOAK_PASSWORD` from `.env`, create your realm, and configure OAuth clients for Kafka, NiFi, and Grafana.
+
+Recommended settings for the NiFi client (Access settings):
+
+- NiFi UI URL: `https://<MACHINE_URL>:8443/nifi`
+- Home URL: `https://<MACHINE_URL>:8443/nifi`
+- Valid Redirect URIs: `https://<MACHINE_URL>:8443/*`
+- Valid post logout URIs: `+`
+- Web Origins: `+`
+
+Copy the client secrets to `.env`:
+
+- `KAFKA_KEYCLOAK_SECRET`
+- `NIFI_KEYCLOAK_SECRET`
+- `GRAFANA_KEYCLOAK_SECRET`
+
+You can stop Keycloak later with:
+
+```bash
+task stop-keycloak
+```
+
 ### Deploy Infrastructure
 
-The `diva` task orchestrates the complete deployment. It verifies that SSL certificates are valid, processes configuration templates by substituting environment variables, and then deploys all services (Kafka, Keycloak, NiFi, and supporting components) using Ansible playbooks. This task represents the main deployment command that brings up the entire system.
+The `diva` task orchestrates deployment of Kafka, NiFi, Quality Reporter, and supporting components using Ansible playbooks. It verifies SSL certificates, processes configuration templates, and runs the playbooks. Keycloak is deployed separately and should be configured beforehand (see above).
 
 ```bash
 task diva
 ```
-
-#### Configuration of OAuth Clients
-
-This section involves manual configuration of OAuth clients in Keycloak for secure authentication across services. After Keycloak is deployed, you must manually create OAuth clients for Kafka, NiFi, and Grafana through the Keycloak web interface. The `process-configuration-templates` task then takes the client secrets you've configured and substitutes them into the service configuration templates, ensuring all components can authenticate properly with Keycloak.
-
-1. Wait for Keycloak prompt: `After Keycloak deployment, you have to manually create a client for NiFi [...]`
-2. Access Keycloak at `KEYCLOAK_URL` and create OAuth clients for *Kafka*, *NiFi*, and *Grafana*
-3. Ensure that the OAuth client for *NiFi* is properly configured in the *Access settings* (e.g., valid redirect URIs).
-4. Copy client secrets to `.env` file (`KAFKA_KEYCLOAK_SECRET`, `NIFI_KEYCLOAK_SECRET`, `GRAFANA_KEYCLOAK_SECRET`)
-5. Run `task process-configuration-templates` in separate terminal
-6. Confirm Ansible prompt to continue
 
 ## Updating Vendored Repositories
 
@@ -114,76 +137,3 @@ moderate-diva-deployment/
 5. Return to the repository root and remove the temporary workspace: `cd .. && rm -rf .tmp-updates`.
 
 Tip: back up the previous vendored directory before replacing it if you expect to compare or restore changes.
-
-### Test the Update
-
-After refreshing any vendored component, run:
-
-```bash
-task process-configuration-templates
-task deploy
-```
-
-Verify the deployment and service logs before committing.
-
-### Commit the Changes
-
-Stage only the updated vendored paths, then create a concise commit describing which components were refreshed:
-
-```bash
-git add kafka/ nifi/ quality_reporter/ ansible-configurator/NiFi_Processors/vendored/
-git commit -m "<updated components>"
-```
-
-### Track Upstream Versions
-
-Before removing the upstream `.git` directory, capture the source commit hash for reference:
-
-```bash
-git log -1 --format="%H %ai %s" > ../../vendored-<component>-version.txt
-```
-
-Aggregate these references in `VENDORED_VERSIONS.md` (create the file if it does not exist) so you always know which upstream revisions are deployed.
-
-### Custom Patches
-
-Apply any local modifications directly to the vendored files, describe them in a `PATCHES.md`, and commit the updates together with the refreshed sources.
-
-### Troubleshooting
-
-- `task update-repos` now points to this manual flow; seeing that message is expected.
-- If deployment fails, verify that all vendored directories were replaced correctly and that no `.git` folders remain.
-- Re-run `task process-configuration-templates` to ensure Ansible receives up-to-date parameters.
-- Inspect Ansible logs for detailed failure messages.
-
-### Optional Update Script
-
-Automate the workflow with a helper script such as:
-
-```bash
-#!/bin/bash
-# update-vendored-repo.sh
-REPO_NAME=$1
-GITLAB_REPO_PATH=$2
-LOCAL_PATH=$3
-
-if [ -z "$REPO_NAME" ] || [ -z "$GITLAB_REPO_PATH" ] || [ -z "$LOCAL_PATH" ]; then
-  echo "Usage: $0 <repo-name> <gitlab-path> <local-path>"
-  exit 1
-fi
-
-mkdir -p .tmp-updates
-cd .tmp-updates
-
-git clone "$GITLAB_REPO_PATH" "$REPO_NAME"
-rm -rf "$REPO_NAME/.git"
-
-cd ..
-[ -d "$LOCAL_PATH" ] && mv "$LOCAL_PATH" "${LOCAL_PATH}.backup"
-mv ".tmp-updates/$REPO_NAME" "$LOCAL_PATH"
-rm -rf .tmp-updates
-
-echo "$REPO_NAME updated. Previous version backed up to ${LOCAL_PATH}.backup"
-```
-
-Make the script executable (`chmod +x update-vendored-repo.sh`) and run it from the repository root when you need a repeatable update process.
