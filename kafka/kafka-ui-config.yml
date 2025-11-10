@@ -10,7 +10,7 @@ auth:
         clientId: kafka_kck_id
         clientSecret: kafka_kck_scr
         scope: openid
-        issuer-uri: https://keycloak_url:7171/realms/project_name
+        issuer-uri: https://keycloak_url/realms/project_name
         user-name-attribute: preferred_username
         client-name: keycloak
         provider: keycloak

@@ -79,13 +79,6 @@ tasks:
     cmds:
       - task: login-registry
 
-  update-repos:
-    desc: "Update vendored repositories (see UPDATING_VENDORED_REPOS.md for instructions)"
-    cmds:
-      - echo "Repositories are now vendored in this codebase."
-      - echo "To update them, see UPDATING_VENDORED_REPOS.md for manual update instructions."
-      - exit 1
-
   login-registry:
     desc: "Log into the Docker registry to access private images"
     cmds:
@@ -243,7 +236,4 @@ tasks:
         ignore_error: true
       - cmd: cd {{.ROOT_DIR}}/{{.QUALITY_REPORTER_SETUP_DIR}} && docker compose down
         ignore_error: true
-      - rm -rf {{.ROOT_DIR}}/{{.KEYCLOAK_SETUP_DIR}}
       - rm -rf {{.ROOT_DIR}}/{{.CERT_DIR}}
-      - echo "Note: Vendored repositories (kafka/, nifi/, quality_reporter/) are preserved."
-      - echo "Generated Ansible parameter files in ansible-configurator/ are preserved."
