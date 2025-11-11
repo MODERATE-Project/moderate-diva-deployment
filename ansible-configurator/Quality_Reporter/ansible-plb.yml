@@ -33,15 +33,13 @@
       loop:
         - "reporter_data"
 
-    - name: Fill in Quality Reporter configuration files
+    - name: Generate Quality Reporter configuration files from templates
       tags: always
-      ansible.builtin.replace:
-        path: "{{ general_vars.digital_twin_folder }}/quality_reporter/{{ item[0] }}"
-        regexp: "(?i:{{ item[1].key }})" # ignore case, match upper and lower without distinction
-        replace: "{{ item[1].value }}"
-      with_nested:
-        - "{{ files_to_fill }}" #for every file in this variable
-        - "{{ kafka_conf | dict2items + grafana_conf | dict2items  + general_vars | dict2items }}" # for every string in these variables
+      ansible.builtin.template:
+        src: "../../quality_reporter/templates/{{ item }}.j2"
+        dest: "{{ general_vars.digital_twin_folder }}/quality_reporter/{{ item }}"
+        mode: '0644'
+      loop: "{{ files_to_fill }}"
 
     - name: Launch Quality Reporter Docker container
       tags: always

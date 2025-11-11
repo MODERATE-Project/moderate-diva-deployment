@@ -21,15 +21,13 @@
       register: kafka_dir
       failed_when: not kafka_dir.stat.exists or not kafka_dir.stat.isdir
 
-    - name: Fill In kafka Configuration Files
+    - name: Generate Kafka configuration files from templates
       tags: always
-      ansible.builtin.replace:
-        path: "{{ general_vars.digital_twin_folder }}/kafka/{{ item[0] }}"
-        regexp: "(?i:{{ item[1].key }})" # ignore case, match upper and lower without distinction
-        replace: "{{ item[1].value }}"
-      with_nested:
-        - "{{ files_to_fill }}" #for every file in this variable
-        - "{{ kafka_cred | dict2items + general_vars | dict2items }}" # for every string in these variables
+      ansible.builtin.template:
+        src: "../../kafka/templates/{{ item }}.j2"
+        dest: "{{ general_vars.digital_twin_folder }}/kafka/{{ item }}"
+        mode: '0644'
+      loop: "{{ files_to_fill }}"
 
     - name: Launch Kafka Docker container
       tags: always

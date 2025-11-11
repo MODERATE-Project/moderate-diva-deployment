@@ -42,15 +42,13 @@
         - "nifi/state"
         - "nifi/logs"
 
-    - name: Fill in Apache NiFi configuration files
+    - name: Generate Apache NiFi configuration files from templates
       tags: always
-      ansible.builtin.replace:
-        path: "{{ general_vars.digital_twin_folder }}/nifi/{{ item[0] }}"
-        regexp: "(?i:{{ item[1].key }})" # ignore case, match upper and lower without distinction
-        replace: "{{ item[1].value }}"
-      with_nested:
-        - "{{ files_to_fill }}" #for every file in this variable
-        - "{{ nifi_cred | dict2items + general_vars | dict2items }}" # for every string in these variables
+      ansible.builtin.template:
+        src: "../../nifi/templates/{{ item }}.j2"
+        dest: "{{ general_vars.digital_twin_folder }}/nifi/{{ item }}"
+        mode: '0644'
+      loop: "{{ files_to_fill }}"
 
     - name: Launch Apache NiFi Docker container
       tags: always

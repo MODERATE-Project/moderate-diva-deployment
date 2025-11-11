@@ -1,0 +1,13 @@
+# Kafka client configuration
+bootstrap.servers={{ general_vars.machine_url }}:9092
+security.protocol=SASL_SSL
+sasl.mechanism=PLAIN
+sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="{{ kafka_cred.kafka_user }}" password="{{ kafka_cred.kafka_psw }}";
+
+# SSL settings
+ssl.keystore.location=/etc/kafka/secrets/kafka.keystore.jks
+ssl.keystore.password={{ general_vars.generic_psw }}
+ssl.truststore.location=/etc/kafka/secrets/kafka.truststore.jks
+ssl.truststore.password={{ general_vars.generic_psw }}
+ssl.endpoint.identification.algorithm=
+

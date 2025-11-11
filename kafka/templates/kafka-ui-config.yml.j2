@@ -1,0 +1,19 @@
+server:
+  servlet:
+    context-path: /kafka
+
+auth:
+  type: OAUTH2
+  oauth2:
+    client:
+      keycloak:
+        clientId: {{ kafka_cred.kafka_kck_id }}
+        clientSecret: {{ kafka_cred.kafka_kck_scr }}
+        scope: openid
+        issuer-uri: https://{{ general_vars.keycloak_url }}/realms/{{ general_vars.project_name }}
+        user-name-attribute: preferred_username
+        client-name: keycloak
+        provider: keycloak
+        custom-params:
+          type: oauth
+

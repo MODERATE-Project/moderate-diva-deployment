@@ -1,0 +1,40 @@
+name: {{ general_vars.project_name }}
+services:
+  nifi:
+    image: docker.io/apache/nifi:2.6.0
+    ports:
+      - 8443:8443
+    volumes:
+      - ../certificates:/opt/certs:ro
+      - ./nifi/database_repository:/opt/nifi/nifi-current/database_repository
+      - ./nifi/flowfile_repository:/opt/nifi/nifi-current/flowfile_repository
+      - ./nifi/content_repository:/opt/nifi/nifi-current/content_repository
+      - ./nifi/provenance_repository:/opt/nifi/nifi-current/provenance_repository
+      - ./nifi/python_extensions:/opt/nifi/nifi-current/python_extensions
+      - ./nifi/work:/opt/nifi/nifi-current/work
+      - ./nifi/nar_extensions:/opt/nifi/nifi-current/nar_extensions
+      - ./nifi/state:/opt/nifi/nifi-current/state
+      - ./nifi/logs:/opt/nifi/nifi-current/logs
+      - ./nifi.properties:/tmp/nifi.properties
+      - nifi-lib:/opt/nifi/nifi-current/lib
+    environment:
+      - SINGLE_USER_CREDENTIALS_USERNAME={{ nifi_cred.nifi_user }}
+      - SINGLE_USER_CREDENTIALS_PASSWORD={{ nifi_cred.nifi_psw }}
+      - KEYSTORE_PATH=/opt/certs/keystore.jks
+      - KEYSTORE_TYPE=JKS
+      - KEY_PASSWORD={{ general_vars.generic_psw }}
+      - KEYSTORE_PASSWORD={{ general_vars.generic_psw }}
+      - TRUSTSTORE_PATH=/opt/certs/truststore.jks
+      - TRUSTSTORE_PASSWORD={{ general_vars.generic_psw }}
+      - TRUSTSTORE_TYPE=JKS
+      - NIFI_WEB_HTTPS_PORT=8443
+      - NIFI_WEB_PROXY_HOST={{ general_vars.machine_url }}:8443
+    networks:
+      - services-network
+volumes:
+  nifi-lib:
+networks:
+  services-network:
+    external: true
+    name: {{ general_vars.project_name }}-network
+

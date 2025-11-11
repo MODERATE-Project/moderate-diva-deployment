@@ -8,6 +8,21 @@ Collection of Ansible Playbooks to deploy Digital Twin infrastructure.
 - Login to the Docker registry in gitlab with `docker login gitlab.linksfoundation.com:5050`
 - In every file `params.yml` (the general one and those in every subfolder), replace `PLCHLD_*` with the actual value to be used in the play.
 
+### Configuration Templates
+
+This configurator uses Jinja2 templates to generate configuration files for each component. The templates are located in their respective app-specific directories:
+
+- `kafka/templates/` - Kafka configuration templates
+- `nifi/templates/` - NiFi configuration templates  
+- `quality_reporter/templates/` - Quality Reporter configuration templates
+
+When you run the Ansible playbooks, they will:
+1. Read the template files (`.j2` extension)
+2. Replace variables with values from `params.yml` files
+3. Generate final configuration files in the component directories (kafka/, nifi/, quality_reporter/)
+
+**Important**: The generated configuration files are gitignored. Only the templates are version-controlled. This keeps the Git repository clean and prevents sensitive data from being accidentally committed.
+
 ## Deployment
 
 ### Complete Infrastructure
@@ -23,6 +38,17 @@ If it is sure that the general script was already executed, enter the folder of 
 ### Updates or Retries after Errors
 
 Run the ansible playbook with the parameter: `--tags never`. It will `docker compose down` every docker compose launched by the playbooks.
+
+### Maintaining Configuration Templates
+
+If you need to update component configurations:
+
+1. **Edit the template files** in the component's `templates/` directory (NOT the generated files in component directories)
+2. The template files use Jinja2 syntax: `{{ variable_name }}`
+3. Variables are defined in the respective `params.yml` files
+4. After editing templates, re-run the Ansible playbook to regenerate the configuration files
+
+**Example**: To change Kafka configuration, edit `kafka/templates/docker-compose.yml.j2`, then run the Kafka playbook.
 
 ### Keycloak
 
