@@ -64,11 +64,11 @@
     - name: Run post-start command inside the container to add NiFi configuration
       tags: always
       community.docker.docker_container_exec:
-        container: "{{ general_vars.project_name }}-nifi-1"
+        container: "{{ general_vars.project_name }}-nifi-nifi-1"
         command: cp -a /tmp/nifi.properties /opt/nifi/nifi-current/conf/nifi.properties
 
     - name: Restart Apache NiFi container
       tags: always
       community.docker.docker_container:
-        name: "{{ general_vars.project_name }}-nifi-1"
+        name: "{{ general_vars.project_name }}-nifi-nifi-1"
         restart: true
