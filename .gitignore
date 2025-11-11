@@ -18,6 +18,14 @@ ansible-configurator/NiFi_Processors/params.yml
 ansible-configurator/Quality_Reporter/params.yml
 ansible-configurator/Service-playbook/params.yml
 
+# Generated configuration files (created from Jinja2 templates by Ansible)
+kafka/client.config
+kafka/docker-compose.yml
+kafka/kafka-ui-config.yml
+nifi/docker-compose.yml
+nifi/nifi.properties
+quality_reporter/docker-compose.yml
+
 # Temporary directory for NiFi Processors (no longer used with vendored approach)
 ansible-configurator/NiFi_Processors/git_tmp/
 
