@@ -1,8 +1,6 @@
 # General Digital Twin Variables
 ---
 
-auth_key: PLCHLD_KEY
-
 general_vars:
   digital_twin_folder: PLCHLD_DT
   generic_psw: PLCHLD_PSW

@@ -1,8 +1,6 @@
 # General Digital Twin Variables
 ---
 
-auth_key: "${AUTH_KEY}"
-
 general_vars:
   digital_twin_folder: "${DIGITAL_TWIN_FOLDER}"
   generic_psw: "${GENERIC_PSW}"

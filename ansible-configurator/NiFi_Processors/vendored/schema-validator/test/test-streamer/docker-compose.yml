@@ -1,3 +1,4 @@
+name: test-data-streamer
 services:
   test-data-streamer:
     build: .

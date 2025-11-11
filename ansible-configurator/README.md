@@ -4,8 +4,6 @@ Collection of Ansible Playbooks to deploy Digital Twin infrastructure.
 
 ## Preparation step
 
-- Add an SSH key to Gitlab for cloning the repositories
-- Login to the Docker registry in gitlab with `docker login gitlab.linksfoundation.com:5050`
 - In every file `params.yml` (the general one and those in every subfolder), replace `PLCHLD_*` with the actual value to be used in the play.
 
 ### Configuration Templates
@@ -121,7 +119,6 @@ After completing the above steps, run the playbooks. The configurator will injec
 
 ### General
 
-- `auth_key`: the SSH key added on gitlab to clone the ansible_configurator repo
 - `digital_twin_folder`: the folder on the machine where the digital twin's files will be stored
 - `generic_psw`: the password used for keystore, truststore and every other place where it is not specified otherwise
 - `machine_url`: the tailscale address of the machine
