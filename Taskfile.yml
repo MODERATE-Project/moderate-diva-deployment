@@ -211,8 +211,8 @@ tasks:
   # Cleanup
   # =================================================================
 
-  clean:
-    desc: "Stop all Docker services and remove generated files (preserves vendored repositories)"
+  stop:
+    desc: "Stop all Docker services and remove generated files (preserves vendored repositories and certificates)"
     cmds:
       - task: stop-caddy
       - cmd: cd {{.ROOT_DIR}}/{{.KAFKA_SETUP_DIR}} && docker compose down
@@ -223,4 +223,3 @@ tasks:
         ignore_error: true
       - cmd: cd {{.ROOT_DIR}}/{{.QUALITY_REPORTER_SETUP_DIR}} && docker compose down
         ignore_error: true
-      - rm -rf {{.ROOT_DIR}}/{{.CERT_DIR}}
