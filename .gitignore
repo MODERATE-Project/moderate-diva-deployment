@@ -29,10 +29,6 @@ quality_reporter/docker-compose.yml
 # Temporary directory for NiFi Processors (no longer used with vendored approach)
 ansible-configurator/NiFi_Processors/git_tmp/
 
-# Quality Reporter data
-quality_reporter/reporter_data/*
-!quality_reporter/reporter_data/.gitkeep
-
 ## Linux
 ########
 

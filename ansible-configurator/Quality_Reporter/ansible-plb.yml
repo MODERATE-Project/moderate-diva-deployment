@@ -21,18 +21,6 @@
       register: quality_reporter_dir
       failed_when: not quality_reporter_dir.stat.exists or not quality_reporter_dir.stat.isdir
 
-    - name: Create Quality Reporter folders structure
-      tags: always
-      ansible.builtin.file:
-        path: "{{ general_vars.digital_twin_folder }}/quality_reporter/{{ item }}"
-        state: directory
-        owner: "1000"
-        group: "1000"
-        mode: "0755"
-        recurse: yes
-      loop:
-        - "reporter_data"
-
     - name: Generate Quality Reporter configuration files from templates
       tags: always
       ansible.builtin.template:

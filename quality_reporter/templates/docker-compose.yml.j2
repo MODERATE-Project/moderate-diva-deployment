@@ -13,7 +13,7 @@ services:
       KAFKA_ENDPOINT_IDENTIFICATION: "{{ kafka_conf.kafka_endpnt_id }}"
       DATABASE_PATH: sqlite:////data/report.db
     volumes:
-      - "./reporter_data:/data"
+      - "reporter_data:/data"
       - "{{ general_vars.digital_twin_folder }}/certificates/:/certs:ro"
     networks:
       - services-network
@@ -56,6 +56,8 @@ services:
 volumes:
   grafana_data:
     name: grafana_data
+  reporter_data:
+    name: reporter_data
 
 networks:
   services-network:
