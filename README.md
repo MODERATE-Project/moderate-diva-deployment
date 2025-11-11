@@ -103,37 +103,136 @@ The `diva` task orchestrates deployment of Kafka, NiFi, Quality Reporter, and su
 task diva
 ```
 
-## Updating Vendored Repositories
+## Configuration Templating System
 
-This repository vendors several upstream projects so deployments remain self-contained. Use this workflow whenever you need to pull in upstream changes.
+This deployment uses Ansible with Jinja2 templates to generate environment-specific configuration files. Templates contain placeholders that are substituted with actual values during deployment, ensuring consistent and reproducible configurations across all services.
 
-### Prerequisites
+### Configuration Flow: From .env to Deployment
 
-- SSH access to `gitlab.linksfoundation.com`
-- `git` installed locally
-- Write access to this repository
+The `.env.default` and `.env` files serve as the **single source of truth** for all configuration values. These environment variables flow through the system in the following sequence:
 
-### Repository Layout
+1. **Environment Variables** (`.env` file)
+   - Copy `.env.default` to `.env` and customize values for your environment
+   - Contains all passwords, URLs, client IDs, and deployment-specific settings
+   - Variables include `MACHINE_URL`, `GENERIC_PSW`, `KAFKA_USER`, `NIFI_KEYCLOAK_SECRET`, etc.
+
+2. **Taskfile Reads Environment** (Taskfile.yml:21-23)
+   - Taskfile automatically loads `.env` and `.env.default` using the `dotenv` directive
+   - All Task commands have access to these environment variables
+   - Tasks like `process-configuration-templates` use these variables
+
+3. **Generate Ansible Parameters** (Taskfile.yml:170-179)
+   - The `process-configuration-templates` task uses `envsubst` to substitute `${VARIABLE}` placeholders
+   - Reads template files from `config/*.params.yml.tpl`
+   - Generates `params.yml` files for each component in `ansible-configurator/`
+   - Example: `${MACHINE_URL}` in template becomes `example.tailscale.net` in generated file
+
+4. **Ansible Loads Parameters** (ansible-configurator/*/ansible-plb.yml)
+   - Each Ansible playbook loads its `params.yml` using `vars_files`
+   - Variables become available as `{{ general_vars.machine_url }}`, `{{ kafka_cred.kafka_user }}`, etc.
+
+5. **Template Substitution** (Ansible `template` module)
+   - Ansible processes Jinja2 templates (`.j2` files) with loaded variables
+   - Generates final configuration files (Docker Compose, properties files, etc.)
+   - Docker Compose uses these generated files to start containers
+
+**Visual Flow:**
+
+```mermaid
+flowchart TD
+    A[".env file<br/>(source of truth)"] --> B["Taskfile.yml<br/>(dotenv loader)"]
+    B --> C["envsubst<br/>(substitutes ${VARS})"]
+    C --> D["config/*.params.yml.tpl"]
+    D --> E["ansible-configurator/*/params.yml<br/>(generated)"]
+    E --> F["Ansible playbooks<br/>(load params.yml via vars_files)"]
+    F --> G["Jinja2 templates<br/>(*.j2 files with {{ vars }})"]
+    G --> H["Generated configs<br/>(docker-compose.yml, nifi.properties, etc.)"]
+    H --> I["Docker Compose<br/>(deployment)"]
+
+    style A fill:#e1f5ff
+    style E fill:#fff4e1
+    style H fill:#e8f5e9
+    style I fill:#f3e5f5
+```
+
+### Template Structure
+
+Configuration templates are organized by component:
 
 ```
 moderate-diva-deployment/
-├── kafka/                                          # Kafka setup
-├── nifi/                                           # NiFi setup
-├── quality_reporter/                               # Quality Reporter setup
-└── ansible-configurator/NiFi_Processors/vendored/  # NiFi processors
-    ├── dqa-validator/
-    ├── schema-validator/
-    └── unified-data-model-encapsulator/
+├── kafka/templates/
+│   ├── docker-compose.yml.j2      # Kafka Docker Compose configuration
+│   ├── client.config.j2           # Kafka client configuration
+│   └── kafka-ui-config.yml.j2     # Kafka UI configuration
+├── nifi/templates/
+│   ├── docker-compose.yml.j2      # NiFi Docker Compose configuration
+│   └── nifi.properties.j2         # NiFi properties file
+└── quality_reporter/templates/
+    └── docker-compose.yml.j2      # Quality Reporter Docker Compose configuration
 ```
 
-### Update Workflow
+### How Ansible Processes Templates
 
-1. From the repository root (`/home/agmangas/moderate-diva-deployment`), create a temporary workspace: `mkdir -p .tmp-updates && cd .tmp-updates`.
-2. Clone the desired upstream repository (Kafka, NiFi, Quality Reporter, or a NiFi processor) from GitLab.
-3. Remove the upstream `.git` directory so the code becomes a vendored copy: `rm -rf <repo>/.git`.
-4. Replace the existing vendored directory:
-   - Kafka / NiFi / Quality Reporter: `rm -rf ../<repo>` then `mv <repo> ..`.
-   - NiFi processors: `rm -rf ../ansible-configurator/NiFi_Processors/vendored/<processor>` then `mv <processor> ../ansible-configurator/NiFi_Processors/vendored/`.
-5. Return to the repository root and remove the temporary workspace: `cd .. && rm -rf .tmp-updates`.
+During deployment, Ansible playbooks use the `ansible.builtin.template` module to process Jinja2 templates:
 
-Tip: back up the previous vendored directory before replacing it if you expect to compare or restore changes.
+1. **Load Variables**: Ansible reads configuration from `params.yml` files (generated from `.env` values)
+2. **Process Templates**: The template module reads `.j2` files and substitutes all `{{ variable_name }}` placeholders
+3. **Generate Configs**: Processed files are written to component directories (without `.j2` extension)
+4. **Deploy Services**: Docker Compose uses the generated configuration files to start containers
+
+### Complete Configuration Transformation Example
+
+This example shows how a single value flows from `.env` through all processing stages:
+
+**Step 1: Source Value in .env**
+```bash
+MACHINE_URL=example.tailscale.net
+KAFKA_USER=kafka_admin
+KAFKA_PASSWORD=securepass123
+GENERIC_PSW=keystorepass
+```
+
+**Step 2: Intermediate Template (config/kafka.params.yml.tpl)**
+```yaml
+kafka_cred:
+  kafka_user: "${KAFKA_USER}"
+  kafka_psw: "${KAFKA_PASSWORD}"
+```
+
+**Step 3: Generated Ansible Parameters (ansible-configurator/Kafka/params.yml)**
+```yaml
+kafka_cred:
+  kafka_user: "kafka_admin"
+  kafka_psw: "securepass123"
+```
+
+**Step 4: Jinja2 Template Input (kafka/templates/client.config.j2)**
+```properties
+bootstrap.servers={{ general_vars.machine_url }}:9092
+sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="{{ kafka_cred.kafka_user }}" password="{{ kafka_cred.kafka_psw }}";
+ssl.keystore.password={{ general_vars.generic_psw }}
+```
+
+**Step 5: Final Generated Configuration (kafka/client.config)**
+```properties
+bootstrap.servers=example.tailscale.net:9092
+sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="kafka_admin" password="securepass123";
+ssl.keystore.password=keystorepass
+```
+
+### Variable Sources
+
+Variables are organized hierarchically in `params.yml` files:
+
+- **General Variables** (`ansible-configurator/params.yml`): Shared across all components (machine URL, project name, Keycloak URL, passwords)
+- **Component Variables** (`ansible-configurator/{Kafka,NiFi,Quality_Reporter}/params.yml`): Component-specific settings (usernames, client IDs, secrets)
+
+These `params.yml` files are generated from your `.env` file during deployment and are not version-controlled (only the `.tpl` templates are tracked in Git).
+
+### Key Playbook Locations
+
+- **Main Playbook**: ansible-configurator/ansible-plb.yml:69
+- **Kafka Playbook**: ansible-configurator/Kafka/ansible-plb.yml:36
+- **NiFi Playbook**: ansible-configurator/NiFi/ansible-plb.yml:45
+- **Quality Reporter Playbook**: ansible-configurator/Quality_Reporter/ansible-plb.yml:36
