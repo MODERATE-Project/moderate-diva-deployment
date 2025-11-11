@@ -30,10 +30,10 @@ task validate-config
 
 ### Initial Setup
 
-The `setup` task prepares the deployment environment by verifying required tools (Docker, Ansible, Python, `keytool`, etc.) and logging into the Docker registry to access private images. All code required for deployment is already vendored in this repository; no repositories are cloned during setup.
+All code and Docker images required for deployment are already available (vendored code in this repository, public Docker images from Docker Hub and Quay.io). Optionally verify that required tools are installed:
 
 ```bash
-task setup
+task check-dependencies
 ```
 
 ### SSL Certificates

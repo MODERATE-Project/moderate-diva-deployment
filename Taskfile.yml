@@ -1,7 +1,6 @@
 version: "3"
 
 vars:
-  IMAGE_REGISTRY_URL: gitlab.linksfoundation.com:5050
   ANSIBLE_CONFIGURATOR_DIR: ansible-configurator
   KAFKA_SETUP_DIR: kafka
   KEYCLOAK_SETUP_DIR: keycloak
@@ -71,18 +70,6 @@ tasks:
   # =================================================================
   # Setup & Environment
   # =================================================================
-
-  setup:
-    desc: "Set up the deployment environment by logging into registry"
-    deps:
-      - check-dependencies
-    cmds:
-      - task: login-registry
-
-  login-registry:
-    desc: "Log into the Docker registry to access private images"
-    cmds:
-      - docker login {{.IMAGE_REGISTRY_URL}}
 
   create-dirs:
     desc: "Create the required directories"
