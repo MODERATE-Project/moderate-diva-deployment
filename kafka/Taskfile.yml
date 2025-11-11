@@ -1,0 +1,229 @@
+version: "3"
+
+vars:
+  CONTAINER_NAME: "kafka1"
+  KAFKA_BOOTSTRAP: '{{ .KAFKA_BOOTSTRAP | default "localhost:9092" }}'
+  TEST_TOPIC: '{{ .TEST_TOPIC | default "task_sanity_topic" }}'
+
+dotenv:
+  - ../.env
+  - ../.env.default
+
+tasks:
+  # ===========================================================================
+  # HEALTH CHECK TASKS
+  # ===========================================================================
+
+  health:
+    desc: "Check Kafka broker health status"
+    cmds:
+      - echo "🏥 Checking Kafka broker health..."
+      - docker exec {{.CONTAINER_NAME}} kafka-broker-api-versions --bootstrap-server {{.KAFKA_BOOTSTRAP}} --command-config /etc/kafka/client.config
+    silent: true
+
+  health:simple:
+    desc: "Simple Docker health check for Kafka container"
+    cmds:
+      - echo "🐳 Checking Docker container health..."
+      - docker ps --filter "name={{.CONTAINER_NAME}}"
+      - |
+        docker inspect {{.CONTAINER_NAME}} \
+          | grep -m1 '"Status"' \
+          | awk -F'"' '{print "Container health status: " $4}' \
+          || echo "Container health status: unavailable"
+    silent: true
+
+  cluster-info:
+    desc: "Display Kafka cluster information"
+    cmds:
+      - echo "📊 Fetching Kafka cluster information..."
+      - docker exec {{.CONTAINER_NAME}} kafka-metadata --bootstrap-server {{.KAFKA_BOOTSTRAP}} --command-config /etc/kafka/client.config --snapshot /var/lib/kafka/data/__cluster_metadata-0/00000000000000000000.log 2>/dev/null || echo "Cluster metadata available via broker API"
+      - docker exec {{.CONTAINER_NAME}} kafka-broker-api-versions --bootstrap-server {{.KAFKA_BOOTSTRAP}} --command-config /etc/kafka/client.config
+    silent: true
+
+  # ===========================================================================
+  # TOPIC MANAGEMENT TASKS
+  # ===========================================================================
+
+  topics:list:
+    desc: "List all Kafka topics"
+    cmds:
+      - echo "📝 Listing all Kafka topics..."
+      - docker exec {{.CONTAINER_NAME}} kafka-topics --list --bootstrap-server {{.KAFKA_BOOTSTRAP}} --command-config /etc/kafka/client.config
+    silent: true
+
+  topics:describe:
+    desc: "Describe a specific topic (usage: task topics:describe TOPIC=my-topic)"
+    vars:
+      TOPIC: "{{.TOPIC | default .TEST_TOPIC}}"
+    cmds:
+      - echo "Describing topic {{.TOPIC}}"
+      - docker exec {{.CONTAINER_NAME}} kafka-topics --describe --topic {{.TOPIC}} --bootstrap-server {{.KAFKA_BOOTSTRAP}} --command-config /etc/kafka/client.config
+    silent: true
+
+  topics:create:
+    desc: "Create a test topic"
+    cmds:
+      - echo "Creating test topic {{.TEST_TOPIC}}"
+      - docker exec {{.CONTAINER_NAME}} kafka-topics --create --topic {{.TEST_TOPIC}} --bootstrap-server {{.KAFKA_BOOTSTRAP}} --command-config /etc/kafka/client.config --partitions 1 --replication-factor 1 --if-not-exists
+      - echo "✅ Topic created successfully"
+    silent: true
+
+  topics:delete:
+    desc: "Delete the test topic"
+    cmds:
+      - echo "Deleting test topic {{.TEST_TOPIC}}"
+      - docker exec {{.CONTAINER_NAME}} kafka-topics --delete --topic {{.TEST_TOPIC}} --bootstrap-server {{.KAFKA_BOOTSTRAP}} --command-config /etc/kafka/client.config
+      - echo "✅ Topic deleted successfully"
+    silent: true
+
+  # ===========================================================================
+  # PRODUCER/CONSUMER TASKS
+  # ===========================================================================
+
+  produce:test:
+    desc: "Produce test messages to the test topic"
+    cmds:
+      - echo "📤 Producing test messages to {{.TEST_TOPIC}}..."
+      - echo "Test message 1 - $(date -Iseconds)" | docker exec -i {{.CONTAINER_NAME}} kafka-console-producer --bootstrap-server {{.KAFKA_BOOTSTRAP}} --producer.config /etc/kafka/client.config --topic {{.TEST_TOPIC}}
+      - echo "Test message 2 - $(date -Iseconds)" | docker exec -i {{.CONTAINER_NAME}} kafka-console-producer --bootstrap-server {{.KAFKA_BOOTSTRAP}} --producer.config /etc/kafka/client.config --topic {{.TEST_TOPIC}}
+      - echo "Test message 3 - $(date -Iseconds)" | docker exec -i {{.CONTAINER_NAME}} kafka-console-producer --bootstrap-server {{.KAFKA_BOOTSTRAP}} --producer.config /etc/kafka/client.config --topic {{.TEST_TOPIC}}
+      - echo "✅ Messages produced successfully"
+    silent: true
+
+  consume:test:
+    desc: "Consume messages from the test topic (from beginning)"
+    cmds:
+      - echo "📥 Consuming messages from {{.TEST_TOPIC}}..."
+      - timeout 10s docker exec {{.CONTAINER_NAME}} kafka-console-consumer --bootstrap-server {{.KAFKA_BOOTSTRAP}} --consumer.config /etc/kafka/client.config --topic {{.TEST_TOPIC}} --from-beginning --timeout-ms 5000 || true
+      - echo "✅ Consumption completed"
+    silent: true
+
+  consumer-groups:list:
+    desc: "List all consumer groups"
+    cmds:
+      - echo "👥 Listing consumer groups..."
+      - docker exec {{.CONTAINER_NAME}} kafka-consumer-groups --list --bootstrap-server {{.KAFKA_BOOTSTRAP}} --command-config /etc/kafka/client.config
+    silent: true
+
+  # ===========================================================================
+  # COMPREHENSIVE SANITY CHECK
+  # ===========================================================================
+
+  sanity-check:
+    desc: "Run a comprehensive Kafka sanity check and health test"
+    cmds:
+      - echo "🚀 Starting Kafka Sanity Check..."
+      - echo ""
+      - echo "═══════════════════════════════════════════════════════════"
+      - echo "Step 1/6 Checking Docker Container Status"
+      - echo "═══════════════════════════════════════════════════════════"
+      - task: health:simple
+      - echo ""
+      - echo "═══════════════════════════════════════════════════════════"
+      - echo "Step 2/6 Verifying Kafka Broker Connectivity"
+      - echo "═══════════════════════════════════════════════════════════"
+      - task: health
+      - echo ""
+      - echo "═══════════════════════════════════════════════════════════"
+      - echo "Step 3/6 Creating Test Topic"
+      - echo "═══════════════════════════════════════════════════════════"
+      - task: topics:create
+      - echo ""
+      - echo "═══════════════════════════════════════════════════════════"
+      - echo "Step 4/6 Producing Test Messages"
+      - echo "═══════════════════════════════════════════════════════════"
+      - task: produce:test
+      - echo ""
+      - echo "═══════════════════════════════════════════════════════════"
+      - echo "Step 5/6 Consuming Test Messages"
+      - echo "═══════════════════════════════════════════════════════════"
+      - task: consume:test
+      - echo ""
+      - echo "═══════════════════════════════════════════════════════════"
+      - echo "Step 6/6 Cleaning Up Test Topic"
+      - echo "═══════════════════════════════════════════════════════════"
+      - task: topics:delete
+      - echo ""
+      - echo "═══════════════════════════════════════════════════════════"
+      - echo "✅ Kafka Sanity Check Completed Successfully!"
+      - echo "═══════════════════════════════════════════════════════════"
+    silent: true
+
+  # ===========================================================================
+  # MONITORING & DIAGNOSTICS
+  # ===========================================================================
+
+  logs:
+    desc: "View Kafka broker logs"
+    cmds:
+      - docker logs {{.CONTAINER_NAME}} --tail 100 -f
+    silent: true
+
+  logs:tail:
+    desc: "Tail last 50 lines of Kafka logs"
+    cmds:
+      - docker logs {{.CONTAINER_NAME}} --tail 50
+    silent: true
+
+  config:show:
+    desc: "Show current Kafka client configuration"
+    cmds:
+      - echo "📋 Kafka Client Configuration:"
+      - cat client.config
+      - echo ""
+      - echo "🔐 Certificate Files:"
+      - ls -lh {{.KEYSTORE_PATH}} {{.TRUSTSTORE_PATH}} 2>/dev/null || echo "Certificate files not found in default location"
+    silent: true
+
+  shell:
+    desc: "Open a shell inside the Kafka container"
+    cmds:
+      - docker exec -it {{.CONTAINER_NAME}} /bin/bash
+    silent: true
+
+  # ===========================================================================
+  # PERFORMANCE & METRICS
+  # ===========================================================================
+
+  metrics:
+    desc: "Show basic Kafka metrics"
+    cmds:
+      - echo "📊 Kafka Metrics:"
+      - echo ""
+      - echo "Topics Count:"
+      - docker exec {{.CONTAINER_NAME}} kafka-topics --list --bootstrap-server {{.KAFKA_BOOTSTRAP}} --command-config /etc/kafka/client.config | wc -l
+      - echo ""
+      - echo "Consumer Groups:"
+      - docker exec {{.CONTAINER_NAME}} kafka-consumer-groups --list --bootstrap-server {{.KAFKA_BOOTSTRAP}} --command-config /etc/kafka/client.config | wc -l
+      - echo ""
+      - echo "Disk Usage:"
+      - docker exec {{.CONTAINER_NAME}} du -sh /var/lib/kafka/data
+    silent: true
+
+  # ===========================================================================
+  # SCHEMA REGISTRY CHECKS
+  # ===========================================================================
+
+  schema-registry:health:
+    desc: "Check Schema Registry health"
+    cmds:
+      - echo "🔍 Checking Schema Registry health..."
+      - curl -s http://localhost:8081/subjects || echo "Schema Registry not accessible"
+    silent: true
+
+  schema-registry:subjects:
+    desc: "List all Schema Registry subjects"
+    cmds:
+      - echo "📋 Listing Schema Registry subjects..."
+      - curl -s http://localhost:8081/subjects | jq '.' || echo "No subjects found or Schema Registry not accessible"
+    silent: true
+
+  # ===========================================================================
+  # QUICK REFERENCE
+  # ===========================================================================
+
+  default:
+    cmds:
+      - task --list
+    silent: true
