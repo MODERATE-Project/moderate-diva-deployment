@@ -38,7 +38,7 @@ task check-dependencies
 
 ### SSL Certificates
 
-This section handles SSL certificate management for secure communication across services. Caddy automatically obtains and renews Let's Encrypt certificates for the root domain and subdomains defined in `caddy/Caddyfile` (e.g., `keycloak.$MACHINE_URL`, `grafana.$MACHINE_URL`, `reporter.$MACHINE_URL`). The certificates must then be copied and converted to Java keystore formats for Kafka, NiFi, and other Java-based services.
+This section handles SSL certificate management for secure communication across services. Caddy automatically obtains and renews Let's Encrypt certificates for the root domain and subdomains defined in `caddy/Caddyfile` (e.g., `keycloak.$MACHINE_URL`, `grafana.$MACHINE_URL`, `reporter.$MACHINE_URL`, `nifi.$MACHINE_URL`, `kafka.$MACHINE_URL`). The certificates must then be copied and converted to Java keystore formats for Kafka, NiFi, and other Java-based services.
 
 #### Initial Certificate Setup
 
@@ -73,21 +73,27 @@ Deploy and configure Keycloak before the rest of the stack so OAuth client crede
 task start-keycloak
 ```
 
-Access Keycloak at `https://keycloak.<MACHINE_URL>` (Caddy terminates TLS and reverse-proxies to Keycloak). Log in with `KEYCLOAK_USER` / `KEYCLOAK_PASSWORD` from `.env`, create your realm, and configure OAuth clients for Kafka, NiFi, and Grafana.
+Access Keycloak at `https://keycloak.<MACHINE_URL>` (Caddy terminates TLS and reverse-proxies to Keycloak). Log in with `KEYCLOAK_USER` / `KEYCLOAK_PASSWORD` from `.env`, create your realm, and configure OAuth clients for **Kafka**, **NiFi**, and **Grafana**.
 
-Recommended settings for the NiFi client (Access settings):
+| Setting                         | NiFi                          | Kafka                                                            |
+| ------------------------------- | ----------------------------- | ---------------------------------------------------------------- |
+| Root URL                        | `https://nifi.<MACHINE_URL>`  | `https://kafka.<MACHINE_URL>`                                    |
+| Home URL                        | `https://nifi.<MACHINE_URL>`  | `https://kafka.<MACHINE_URL>`                                    |
+| Valid redirect URIs             | `https://nifi.<MACHINE_URL>*` | `https://kafka.<MACHINE_URL>*` and `http://kafka.<MACHINE_URL>*` |
+| Valid post-logout redirect URIs | `+`                           | `+`                                                              |
+| Web origins                     | `+`                           | `+`                                                              |
 
-- NiFi UI URL: `https://<MACHINE_URL>:8443/nifi`
-- Home URL: `https://<MACHINE_URL>:8443/nifi`
-- Valid Redirect URIs: `https://<MACHINE_URL>:8443/*`
-- Valid post logout URIs: `+`
-- Web Origins: `+`
+> [!NOTE]
+> Grafana uses pre-configured usernames and passwords and does not seem to integrate with Keycloak for authentication.
 
 Copy the client secrets to `.env`:
 
 - `KAFKA_KEYCLOAK_SECRET`
 - `NIFI_KEYCLOAK_SECRET`
 - `GRAFANA_KEYCLOAK_SECRET`
+
+> [!IMPORTANT]
+> Make sure the client IDs in Keycloak match the values defined in `KAFKA_KEYCLOAK_ID`, `NIFI_KEYCLOAK_ID` and `GRAFANA_KEYCLOAK_ID`.
 
 You can stop Keycloak later with:
 
@@ -112,22 +118,26 @@ This deployment uses Ansible with Jinja2 templates to generate environment-speci
 The `.env.default` and `.env` files serve as the **single source of truth** for all configuration values. These environment variables flow through the system in the following sequence:
 
 1. **Environment Variables** (`.env` file)
+
    - Copy `.env.default` to `.env` and customize values for your environment
    - Contains all passwords, URLs, client IDs, and deployment-specific settings
    - Variables include `MACHINE_URL`, `GENERIC_PSW`, `KAFKA_USER`, `NIFI_KEYCLOAK_SECRET`, etc.
 
-2. **Taskfile Reads Environment** (Taskfile.yml:21-23)
+2. **Taskfile Reads Environment** (Taskfile.yml)
+
    - Taskfile automatically loads `.env` and `.env.default` using the `dotenv` directive
    - All Task commands have access to these environment variables
    - Tasks like `process-configuration-templates` use these variables
 
-3. **Generate Ansible Parameters** (Taskfile.yml:170-179)
+3. **Generate Ansible Parameters** (Taskfile.yml)
+
    - The `process-configuration-templates` task uses `envsubst` to substitute `${VARIABLE}` placeholders
    - Reads template files from `config/*.params.yml.tpl`
    - Generates `params.yml` files for each component in `ansible-configurator/`
    - Example: `${MACHINE_URL}` in template becomes `example.tailscale.net` in generated file
 
-4. **Ansible Loads Parameters** (ansible-configurator/*/ansible-plb.yml)
+4. **Ansible Loads Parameters** (ansible-configurator/\*/ansible-plb.yml)
+
    - Each Ansible playbook loads its `params.yml` using `vars_files`
    - Variables become available as `{{ general_vars.machine_url }}`, `{{ kafka_cred.kafka_user }}`, etc.
 
@@ -181,46 +191,6 @@ During deployment, Ansible playbooks use the `ansible.builtin.template` module t
 3. **Generate Configs**: Processed files are written to component directories (without `.j2` extension)
 4. **Deploy Services**: Docker Compose uses the generated configuration files to start containers
 
-### Complete Configuration Transformation Example
-
-This example shows how a single value flows from `.env` through all processing stages:
-
-**Step 1: Source Value in .env**
-```bash
-MACHINE_URL=example.tailscale.net
-KAFKA_USER=kafka_admin
-KAFKA_PASSWORD=securepass123
-GENERIC_PSW=keystorepass
-```
-
-**Step 2: Intermediate Template (config/kafka.params.yml.tpl)**
-```yaml
-kafka_cred:
-  kafka_user: "${KAFKA_USER}"
-  kafka_psw: "${KAFKA_PASSWORD}"
-```
-
-**Step 3: Generated Ansible Parameters (ansible-configurator/Kafka/params.yml)**
-```yaml
-kafka_cred:
-  kafka_user: "kafka_admin"
-  kafka_psw: "securepass123"
-```
-
-**Step 4: Jinja2 Template Input (kafka/templates/client.config.j2)**
-```properties
-bootstrap.servers={{ general_vars.machine_url }}:9092
-sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="{{ kafka_cred.kafka_user }}" password="{{ kafka_cred.kafka_psw }}";
-ssl.keystore.password={{ general_vars.generic_psw }}
-```
-
-**Step 5: Final Generated Configuration (kafka/client.config)**
-```properties
-bootstrap.servers=example.tailscale.net:9092
-sasl.jaas.config=org.apache.kafka.common.security.plain.PlainLoginModule required username="kafka_admin" password="securepass123";
-ssl.keystore.password=keystorepass
-```
-
 ### Variable Sources
 
 Variables are organized hierarchically in `params.yml` files:
@@ -229,10 +199,3 @@ Variables are organized hierarchically in `params.yml` files:
 - **Component Variables** (`ansible-configurator/{Kafka,NiFi,Quality_Reporter}/params.yml`): Component-specific settings (usernames, client IDs, secrets)
 
 These `params.yml` files are generated from your `.env` file during deployment and are not version-controlled (only the `.tpl` templates are tracked in Git).
-
-### Key Playbook Locations
-
-- **Main Playbook**: ansible-configurator/ansible-plb.yml:69
-- **Kafka Playbook**: ansible-configurator/Kafka/ansible-plb.yml:36
-- **NiFi Playbook**: ansible-configurator/NiFi/ansible-plb.yml:45
-- **Quality Reporter Playbook**: ansible-configurator/Quality_Reporter/ansible-plb.yml:36

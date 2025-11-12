@@ -141,26 +141,23 @@ nifi.status.repository.questdb.persist.location=./status_repository
 
 # Site to Site properties
 nifi.remote.input.host=4038cfc251ed
-nifi.remote.input.secure=true
+nifi.remote.input.secure=false
 nifi.remote.input.socket.port=10000
-nifi.remote.input.http.enabled=true
+nifi.remote.input.http.enabled=false
 nifi.remote.input.http.transaction.ttl=30 sec
 nifi.remote.contents.cache.expiration=30 secs
 
 # web properties #
 #############################################
 
-# For security, NiFi will present the UI on 127.0.0.1 and only be accessible through this loopback interface.
-# Be aware that changing these properties may affect how your instance can be accessed without any restriction.
-# We recommend configuring HTTPS instead. The administrators guide provides instructions on how to do this.
-
+# HTTP interface disabled - NiFi served via HTTPS behind Caddy
 nifi.web.http.host=
 nifi.web.http.port=
 nifi.web.http.network.interface.default=
 
 #############################################
-
-nifi.web.https.host=4038cfc251ed
+# HTTPS interface (proxied by Caddy)
+nifi.web.https.host=0.0.0.0
 nifi.web.https.port=8443
 nifi.web.https.network.interface.default=
 nifi.web.https.application.protocols=h2 http/1.1
@@ -168,7 +165,7 @@ nifi.web.jetty.working.directory=./work/jetty
 nifi.web.jetty.threads=200
 nifi.web.max.header.size=16 KB
 nifi.web.proxy.context.path=
-nifi.web.proxy.host={{ general_vars.machine_url }}:8443
+nifi.web.proxy.host=nifi.{{ general_vars.machine_url }}
 nifi.web.max.content.size=
 nifi.web.max.requests.per.second=30000
 nifi.web.max.access.token.requests.per.second=25
@@ -180,9 +177,9 @@ nifi.web.request.log.format=%{client}a - %u %t "%r" %s %O "%{Referer}i" "%{User-
 # Filter JMX MBeans available through the System Diagnostics REST API
 nifi.web.jmx.metrics.allowed.filter.pattern=
 
-# Include or Exclude TLS Cipher Suites for HTTPS
-nifi.web.https.ciphersuites.include=
-nifi.web.https.ciphersuites.exclude=
+# Include or Exclude TLS Cipher Suites for HTTPS (disabled - using HTTP mode)
+#nifi.web.https.ciphersuites.include=
+#nifi.web.https.ciphersuites.exclude=
 
 # security properties #
 nifi.sensitive.props.key=lWfzlMVFRJRflHrf28VdBS7I/Fuo9Rat
@@ -268,7 +265,7 @@ nifi.listener.bootstrap.port=0
 # cluster common properties (all nodes must have same values) #
 nifi.cluster.protocol.heartbeat.interval=5 sec
 nifi.cluster.protocol.heartbeat.missable.max=8
-nifi.cluster.protocol.is.secure=true
+nifi.cluster.protocol.is.secure=false
 
 # cluster node properties (only configure for cluster nodes) #
 nifi.cluster.is.node=false

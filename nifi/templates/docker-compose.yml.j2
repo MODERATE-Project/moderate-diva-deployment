@@ -2,8 +2,8 @@ name: {{ general_vars.project_name }}-nifi
 services:
   nifi:
     image: docker.io/apache/nifi:2.6.0
-    ports:
-      - 8443:8443
+    # Port mapping removed - NiFi accessed via Caddy reverse proxy
+    # Internal HTTPS port 8443 available within Docker network
     volumes:
       - ../certificates:/opt/certs:ro
       - ./nifi/database_repository:/opt/nifi/nifi-current/database_repository
@@ -20,15 +20,18 @@ services:
     environment:
       - SINGLE_USER_CREDENTIALS_USERNAME={{ nifi_cred.nifi_user }}
       - SINGLE_USER_CREDENTIALS_PASSWORD={{ nifi_cred.nifi_psw }}
-      - KEYSTORE_PATH=/opt/certs/keystore.jks
-      - KEYSTORE_TYPE=JKS
-      - KEY_PASSWORD={{ general_vars.generic_psw }}
-      - KEYSTORE_PASSWORD={{ general_vars.generic_psw }}
-      - TRUSTSTORE_PATH=/opt/certs/truststore.jks
-      - TRUSTSTORE_PASSWORD={{ general_vars.generic_psw }}
-      - TRUSTSTORE_TYPE=JKS
+      - NIFI_WEB_HTTPS_HOST=0.0.0.0
       - NIFI_WEB_HTTPS_PORT=8443
-      - NIFI_WEB_PROXY_HOST={{ general_vars.machine_url }}:8443
+      - NIFI_WEB_PROXY_HOST=nifi.{{ general_vars.machine_url }}
+      - NIFI_SECURITY_KEYSTORE=/opt/certs/keystore.jks
+      - NIFI_SECURITY_KEYSTORETYPE=JKS
+      - NIFI_SECURITY_KEYSTOREPASSWD={{ general_vars.generic_psw }}
+      - NIFI_SECURITY_KEYPASSWD={{ general_vars.generic_psw }}
+      - NIFI_SECURITY_TRUSTSTORE=/opt/certs/truststore.jks
+      - NIFI_SECURITY_TRUSTSTORETYPE=JKS
+      - NIFI_SECURITY_TRUSTSTOREPASSWD={{ general_vars.generic_psw }}
+      - NIFI_REMOTE_INPUT_SECURE=false
+      - NIFI_CLUSTER_PROTOCOL_IS_SECURE=false
     networks:
       - services-network
 volumes:

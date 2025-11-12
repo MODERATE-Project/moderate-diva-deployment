@@ -41,3 +41,40 @@ keycloak.{$MACHINE_URL} {
 
 	reverse_proxy keycloak:8080
 }
+
+nifi.{$MACHINE_URL} {
+	tls {$LETSENCRYPT_EMAIL}
+
+	log {
+		output stdout
+		level INFO
+	}
+
+	# NiFi listens on HTTPS internally with a certificate issued for {$MACHINE_URL}
+	# (no subdomain). Because Caddy terminates public TLS on nifi.{$MACHINE_URL},
+	# we override the upstream Host header and TLS SNI to {$MACHINE_URL} so the
+	# Jetty server accepts the request instead of returning "Invalid SNI".
+	# The certificate does not currently match the public name, so we temporarily
+	# disable upstream certificate verification. Once NiFi presents a cert that
+	# includes nifi.{$MACHINE_URL}, remove tls_insecure_skip_verify and restore
+	# the Host header/SNI to the public value.
+	reverse_proxy https://nifi:8443 {
+		header_up Host {$MACHINE_URL}
+		header_up X-Forwarded-Proto https
+		transport http {
+			tls_insecure_skip_verify
+			tls_server_name {$MACHINE_URL}
+		}
+	}
+}
+
+kafka.{$MACHINE_URL} {
+	tls {$LETSENCRYPT_EMAIL}
+
+	log {
+		output stdout
+		level INFO
+	}
+
+	reverse_proxy kafka-ui:8080
+}
