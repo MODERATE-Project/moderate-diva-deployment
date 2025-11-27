@@ -198,6 +198,23 @@ class TopicStats():
             logger.error(f"Database error getting report: {e}")
             return {}
 
+    def clear_report(self):
+        """Deletes all records from the report table.
+
+        Returns:
+            int: The number of records deleted.
+        """
+        try:
+            with Session(self.engine) as db:
+                num_deleted = db.query(self.Report).delete()
+                db.commit()
+                logger.info(f"Cleared {num_deleted} records from the report table.")
+                return num_deleted
+        except SQLAlchemyError as e:
+            logger.error(f"Database error while clearing report table: {e}")
+            db.rollback()
+            return 0
+
     def _compute_stats_loop(self):
         """Internal method that runs in background thread to process Kafka messages."""
         try:

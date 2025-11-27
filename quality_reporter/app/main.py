@@ -27,9 +27,9 @@ async def shutdown_event():
     topic_stats.stop()
     logger.info("=== SHUTDOWN EVENT COMPLETE ===")
 
-# The requests that are used to retrieve the messages statistics are handled by the stats router.
+# Include all endpoints related to the report (GET, DELETE, etc.)
 app.include_router(stats.router,
-    tags=["Get Report"],
+    tags=["Report"],
     responses={404: settings.response_404}
 )
 
