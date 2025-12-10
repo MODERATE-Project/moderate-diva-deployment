@@ -34,3 +34,4 @@
       community.docker.docker_compose_v2:
         project_src: "{{ general_vars.digital_twin_folder }}/quality_reporter/"
         state: present
+        build: always
