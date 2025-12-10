@@ -109,6 +109,46 @@ The `diva` task orchestrates deployment of Kafka, NiFi, Quality Reporter, and su
 task diva
 ```
 
+## NiFi Processors
+
+Custom NiFi processors are vendored under `ansible-configurator/NiFi_Processors/vendored/` to keep deployments reproducible (no external clones at deploy time). They cover schema normalization, rule generation, data quality checks, and schema-registry validation so that datasets stay consistent as they flow through NiFi and Kafka.
+
+- **Suggested flow:** Encapsulate → Build rules → Validate quality → Validate schema (see below for details and when to enable each step).
+
+### Unified Data Model Encapsulator
+
+- **Purpose:** Wraps incoming payloads into a consistent envelope with metadata fields such as `sourceType`, `sourceID`, `infoType`, `dataType`, `dataItemID`, and `metricTypeID`.
+- **Properties:** The six metadata fields (required); set literal values or NiFi Expression Language to read FlowFile attributes.
+- **Inputs:** FlowFile content is passed through untouched; attributes optionally used to fill properties.
+- **Outputs:** Same content, with metadata injected into the JSON envelope.
+- **Configure:** Set each property to an attribute expression (e.g., `${source.id}`) or static string so every record leaves with a full envelope before validation.
+
+### Rule Builder (`RuleBuilderProcessor.py`)
+
+- **Purpose:** Samples CSV/JSON content (auto-detected or forced) to infer lightweight DQA rules (exists, datatype, numeric domain, categorical values, optional regex).
+- **Properties:** `Sample Size`, `Max Categories`, `Regex Derivation` (bool), `Dataset ID Attribute`, `Fingerprint Attribute`, `Format` (AUTO/CSV/JSON).
+- **Inputs:** FlowFile content (CSV/JSON) and attributes holding dataset id/fingerprint (if present).
+- **Outputs:** Attributes `dqa.rules` (YAML), `dqa.version` (fingerprint), dataset id, fingerprint, `dqa.format`; relationships `success` / `failure`.
+- **Configure (dataset id):** Defaults to attribute `dataset.id`; if missing, the processor uses `"default-dataset"`. Set this attribute upstream (e.g., UpdateAttribute) so caching and rule grouping are stable.
+- **Configure (fingerprint):** Defaults to attribute `dataset.fingerprint`; if missing, the processor computes one from content: JSON → hashes top-level keys (first element for arrays); CSV → hashes header line; otherwise hashes content prefix. Reusing a provided fingerprint keeps cache hits consistent across JVMs.
+- **Configure (general):** Leave `Format` as `AUTO` unless you want to force CSV/JSON, tune `Sample Size`/`Max Categories`/`Regex Derivation` to control inferred rules, and send `failure` to DLQ/alerting.
+
+### DQA Validator (`dqa-validator`)
+
+- **Purpose:** Applies YAML-defined validation rules (domain, datatype, categorical, string length, missing, regex) using JMESPath feature paths.
+- **Properties:** `Validator ID`, `Validation Rules` (YAML string; typically `${dqa.rules}`).
+- **Inputs:** FlowFile content as JSON sample; `Validation Rules` property or attribute.
+- **Outputs:** FlowFile content replaced with validation result JSON; relationships `valid` / `invalid` / `failure`.
+- **Configure:** Set `Validation Rules` to `${dqa.rules}` (Rule Builder output) or a static YAML; set `Validator ID` for traceability; route `invalid` separately from `failure`.
+
+### Schema Validator (`SchemaValidator.py`)
+
+- **Purpose:** Checks incoming JSON against schemas from a Kafka Schema Registry; can learn new schemas (unless `Strict Check` is true) once seen a minimum number of times.
+- **Properties:** `Validator ID`, `Kafka URI`, `Kafka_topic`, optional `Kafka schema ids`, `Minimum Threshold`, `Strict Check`, `Messages History`.
+- **Inputs:** FlowFile content JSON with `metricValue` payload; properties may use Expression Language to pull topic/ids from attributes.
+- **Outputs:** FlowFile content replaced with validation result JSON; relationships `valid` / `invalid` / `failure`; may register schemas when allowed.
+- **Configure:** Set `Kafka URI` to the registry endpoint (e.g., `http://kafka.${MACHINE_URL}:8081`), pre-seed known schemas via `Kafka schema ids`, enable `Strict Check=true` to block unknown schemas, and tune `Minimum Threshold`/`Messages History` to balance learning speed vs noise.
+
 ## Configuration Templating System
 
 This deployment uses Ansible with Jinja2 templates to generate environment-specific configuration files. Templates contain placeholders that are substituted with actual values during deployment, ensuring consistent and reproducible configurations across all services.
