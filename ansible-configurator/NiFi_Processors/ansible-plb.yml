@@ -26,6 +26,12 @@
         dest: "{{ general_vars.digital_twin_folder }}/nifi/nifi/python_extensions/"
       with_fileglob: "vendored/unified-data-model-encapsulator/*.py"
 
+    - name: Copy Rule Builder Files from vendored repository
+      ansible.builtin.copy:
+        src: "{{ item }}"
+        dest: "{{ general_vars.digital_twin_folder }}/nifi/nifi/python_extensions/"
+      with_fileglob: "vendored/rule-builder/*.py"
+
     - name: Remove __init__ file
       ansible.builtin.file:
         path: ./__init__.py
