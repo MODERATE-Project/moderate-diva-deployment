@@ -270,3 +270,59 @@ tasks:
       QUALITY_REPORTER_URL: '{{.QUALITY_REPORTER_URL | default "http://localhost:8000"}}'
     cmds:
       - python3 {{.ROOT_DIR}}/scripts/quality_report_client.py --url {{.QUALITY_REPORTER_URL}} clear {{.CLI_ARGS}}
+
+  publish-dataset:
+    desc: "Publish a dataset ingestion request to Kafka via REST Proxy"
+    vars:
+      KAFKA_REST_URL: '{{.KAFKA_REST_URL | default (printf "https://kafka-rest.%s" .MACHINE_URL)}}'
+      KAFKA_REST_BASIC_AUTH_USER: '{{.KAFKA_REST_BASIC_AUTH_USER | default ""}}'
+      KAFKA_REST_BASIC_AUTH_PASSWORD: '{{.KAFKA_REST_BASIC_AUTH_PASSWORD | default ""}}'
+      KAFKA_INGESTION_TOPIC: '{{.KAFKA_INGESTION_TOPIC | default "data-ingestion-trigger"}}'
+    env:
+      KAFKA_REST_URL: "{{.KAFKA_REST_URL}}"
+      KAFKA_REST_BASIC_AUTH_USER: "{{.KAFKA_REST_BASIC_AUTH_USER}}"
+      KAFKA_REST_BASIC_AUTH_PASSWORD: "{{.KAFKA_REST_BASIC_AUTH_PASSWORD}}"
+      KAFKA_INGESTION_TOPIC: "{{.KAFKA_INGESTION_TOPIC}}"
+    cmds:
+      - python3 {{.ROOT_DIR}}/scripts/publish_dataset.py publish {{.CLI_ARGS}}
+
+  publish-dataset-dry-run:
+    desc: "Show what would be published without actually publishing"
+    vars:
+      KAFKA_REST_URL: '{{.KAFKA_REST_URL | default (printf "https://kafka-rest.%s" .MACHINE_URL)}}'
+      KAFKA_REST_BASIC_AUTH_USER: '{{.KAFKA_REST_BASIC_AUTH_USER | default ""}}'
+      KAFKA_REST_BASIC_AUTH_PASSWORD: '{{.KAFKA_REST_BASIC_AUTH_PASSWORD | default ""}}'
+      KAFKA_INGESTION_TOPIC: '{{.KAFKA_INGESTION_TOPIC | default "data-ingestion-trigger"}}'
+    env:
+      KAFKA_REST_URL: "{{.KAFKA_REST_URL}}"
+      KAFKA_REST_BASIC_AUTH_USER: "{{.KAFKA_REST_BASIC_AUTH_USER}}"
+      KAFKA_REST_BASIC_AUTH_PASSWORD: "{{.KAFKA_REST_BASIC_AUTH_PASSWORD}}"
+      KAFKA_INGESTION_TOPIC: "{{.KAFKA_INGESTION_TOPIC}}"
+    cmds:
+      - python3 {{.ROOT_DIR}}/scripts/publish_dataset.py publish --dry-run {{.CLI_ARGS}}
+
+  kafka-list-topics:
+    desc: "List available Kafka topics via REST Proxy"
+    vars:
+      KAFKA_REST_URL: '{{.KAFKA_REST_URL | default (printf "https://kafka-rest.%s" .MACHINE_URL)}}'
+      KAFKA_REST_BASIC_AUTH_USER: '{{.KAFKA_REST_BASIC_AUTH_USER | default ""}}'
+      KAFKA_REST_BASIC_AUTH_PASSWORD: '{{.KAFKA_REST_BASIC_AUTH_PASSWORD | default ""}}'
+    env:
+      KAFKA_REST_URL: "{{.KAFKA_REST_URL}}"
+      KAFKA_REST_BASIC_AUTH_USER: "{{.KAFKA_REST_BASIC_AUTH_USER}}"
+      KAFKA_REST_BASIC_AUTH_PASSWORD: "{{.KAFKA_REST_BASIC_AUTH_PASSWORD}}"
+    cmds:
+      - python3 {{.ROOT_DIR}}/scripts/publish_dataset.py list-topics {{.CLI_ARGS}}
+
+  kafka-topic-info:
+    desc: "Get information about a Kafka topic"
+    vars:
+      KAFKA_REST_URL: '{{.KAFKA_REST_URL | default (printf "https://kafka-rest.%s" .MACHINE_URL)}}'
+      KAFKA_REST_BASIC_AUTH_USER: '{{.KAFKA_REST_BASIC_AUTH_USER | default ""}}'
+      KAFKA_REST_BASIC_AUTH_PASSWORD: '{{.KAFKA_REST_BASIC_AUTH_PASSWORD | default ""}}'
+    env:
+      KAFKA_REST_URL: "{{.KAFKA_REST_URL}}"
+      KAFKA_REST_BASIC_AUTH_USER: "{{.KAFKA_REST_BASIC_AUTH_USER}}"
+      KAFKA_REST_BASIC_AUTH_PASSWORD: "{{.KAFKA_REST_BASIC_AUTH_PASSWORD}}"
+    cmds:
+      - python3 {{.ROOT_DIR}}/scripts/publish_dataset.py topic-info {{.CLI_ARGS}}
