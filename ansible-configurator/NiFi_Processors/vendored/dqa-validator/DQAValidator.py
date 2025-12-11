@@ -433,11 +433,9 @@ class StandardValidator:
 
         feature_path, key = split_on_last_dot(feature_path)
 
-        print(sample)
         values = self._get_values(sample, feature_path)
         should_exist = specs['exists']
         checks = []
-        print(values)
         for value in values:
             if should_exist:
                 try:
@@ -511,7 +509,6 @@ class StandardValidator:
         List[Union[str, int, float, bool]]
             A list of values corresponding to the specified feature path.
         """
-       
         def extract_values(data):
             if isinstance(data, dict):
                 values = []
@@ -525,14 +522,89 @@ class StandardValidator:
                 return values
             else:
                 return [data]
-               
-       
-        
+
+        def normalize_path(path: str) -> str:
+            """Normalize dotted paths so keys with spaces/punctuation are quoted.
+            
+            JMESPath uses dot-quoted identifiers for special keys: foo."key with space"
+            Array indexes use bracket notation: foo[0], foo[*]
+            """
+            segments = []
+            buf = []
+            bracket_depth = 0
+            for ch in path:
+                if ch == '.' and bracket_depth == 0:
+                    segments.append(''.join(buf))
+                    buf = []
+                    continue
+                if ch == '[':
+                    bracket_depth += 1
+                elif ch == ']':
+                    bracket_depth = max(0, bracket_depth - 1)
+                buf.append(ch)
+            segments.append(''.join(buf))
+
+            simple_ident = re.compile(r'^[A-Za-z_][A-Za-z0-9_]*$')
+            # Match any base followed by array suffix like [0], [*], [?...].
+            array_suffix = re.compile(r'^([^\[]+)(\[.+\])$')
+            # Match already-quoted identifier: "something"
+            already_quoted = re.compile(r'^".*"$')
+
+            normalized = []
+            for seg in segments:
+                if not seg:
+                    continue
+                if seg == '*':
+                    normalized.append(seg)
+                    continue
+                # Already quoted (e.g., "Key With Space") — leave as-is.
+                if already_quoted.match(seg):
+                    normalized.append(seg)
+                    continue
+                # Bracket-only segment (e.g., [0] or [*]) — leave as-is.
+                if seg.startswith('['):
+                    normalized.append(seg)
+                    continue
+
+                array_match = array_suffix.match(seg)
+                if array_match:
+                    base, suffix = array_match.groups()
+                    if simple_ident.match(base):
+                        normalized.append(f"{base}{suffix}")
+                    else:
+                        escaped = base.replace('\\', '\\\\').replace('"', r'\"')
+                        normalized.append(f'"{escaped}"{suffix}')
+                    continue
+
+                if simple_ident.match(seg):
+                    normalized.append(seg)
+                else:
+                    escaped = seg.replace('\\', '\\\\').replace('"', r'\"')
+                    normalized.append(f'"{escaped}"')
+
+            # Join segments with dots; bracket-only segments don't need a leading dot.
+            result_parts = []
+            for seg in normalized:
+                if not result_parts:
+                    result_parts.append(seg)
+                elif seg.startswith('['):
+                    result_parts.append(seg)
+                else:
+                    result_parts.append('.')
+                    result_parts.append(seg)
+            return ''.join(result_parts)
+
         if feature_path == '*':
             return extract_values(sample)
         else:
-            values = jmespath.search(feature_path, sample)
-            if isinstance(values, List):
+            normalized_path = normalize_path(feature_path)
+            try:
+                values = jmespath.search(normalized_path, sample)
+            except Exception as exc:
+                # Fallback to None to surface a failed check instead of raising.
+                print(f"DQAValidator: jmespath error on '{normalized_path}': {exc}")
+                values = None
+
+            if isinstance(values, list):
                 return values
-            else:
-                return [values]
+            return [values]
