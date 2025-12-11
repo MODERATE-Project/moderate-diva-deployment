@@ -22,6 +22,7 @@ import jmespath
 import yaml
 import time
 import functools
+import traceback
 from typing import Dict, List, Union
 
 class DQAValidator(FlowFileTransform):
@@ -71,9 +72,9 @@ class DQAValidator(FlowFileTransform):
     def onScheduled(self, context):
         """ Put here all the 'preloading' to improve processor performance.
         """
-        validatorID = context.getProperty(self.VALIDATOR_ID).getValue()
-        rules = context.getProperty(self.VALIDATION_RULES).getValue()
-        self.validator = StandardValidator(validatorID, rules)
+        # Store descriptors so we can evaluate expressions against the FlowFile later.
+        self.validator_id_prop = context.getProperty(self.VALIDATOR_ID)
+        self.rules_prop = context.getProperty(self.VALIDATION_RULES)
 
     def getPropertyDescriptors(self):
         """ Do not change.
@@ -89,8 +90,13 @@ class DQAValidator(FlowFileTransform):
         """ Write here all of the processor logic.
         """
         try:
+            # Evaluate properties with FlowFile attributes so dynamic rules (e.g. dqa.rules) are resolved.
+            validatorID = self.validator_id_prop.evaluateAttributeExpressions(flowfile).getValue()
+            rules_text = self.rules_prop.evaluateAttributeExpressions(flowfile).getValue()
+            validator = StandardValidator(validatorID, rules_text)
+
             input_data = json.loads(flowfile.getContentsAsBytes().decode('utf-8'))
-            validationRes = self.validator.validate(input_data)
+            validationRes = validator.validate(input_data)
             output = json.dumps(validationRes)
             all_valid = all(v['result'] for v in validationRes['validations'])
             if all_valid:
@@ -98,7 +104,9 @@ class DQAValidator(FlowFileTransform):
             else:
                 return FlowFileTransformResult(relationship = "invalid", contents=output) 
         except Exception as e:
-            self.logger.error(e)
+            # Log stringified error to avoid py4j trying to serialize the Python exception object.
+            self.logger.error(str(e))
+            self.logger.error(traceback.format_exc())
             return FlowFileTransformResult(relationship = "failure")
 
 
@@ -149,6 +157,11 @@ class StandardValidator:
         else:
             with open(config, "r") as fp:
                 self.config = yaml.safe_load(fp) 
+
+        if not isinstance(self.config, dict):
+            raise ValueError("Validation rules must be a YAML mapping.")
+        if "rules" not in self.config or not isinstance(self.config["rules"], list):
+            raise ValueError("Validation rules must contain a 'rules' list.")
 
     def validate(self, sample: Dict) -> Dict:
         """
@@ -216,6 +229,10 @@ class StandardValidator:
         max_value = specs.get("max")
 
         for value in values:
+            # Skip comparisons when value is None; treat as failing the check.
+            if value is None:
+                checks.append(False)
+                continue
             if min_value is not None and max_value is not None:
                 checks.append(min_value <= value <= max_value)
             elif min_value is not None:
