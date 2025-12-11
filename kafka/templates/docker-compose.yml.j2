@@ -141,8 +141,6 @@ services:
         condition: service_healthy
       schema-registry:
         condition: service_started
-    ports:
-      - "8082:8082"
     hostname: rest-proxy
     container_name: rest-proxy
     environment:

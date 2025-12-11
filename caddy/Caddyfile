@@ -78,3 +78,22 @@ kafka.{$MACHINE_URL} {
 
 	reverse_proxy kafka-ui:8080
 }
+
+kafka-rest.{$MACHINE_URL} {
+	tls {$LETSENCRYPT_EMAIL}
+
+	log {
+		output stdout
+		level INFO
+	}
+
+	# Protect Kafka REST Proxy with basic auth; password is pre-hashed
+	# NOTE: Basic Auth here is a temporary stopgap for protecting the Kafka REST Proxy.
+	# For production deployments, this should be replaced with proper integration
+	# with Keycloak/OAuth2/OIDC to secure the kafka-rest.{$MACHINE_URL} endpoint.
+	basicauth {
+		{$KAFKA_REST_BASIC_AUTH_USER} {$KAFKA_REST_BASIC_AUTH_PASSWORD_HASH}
+	}
+
+	reverse_proxy rest-proxy:8082
+}

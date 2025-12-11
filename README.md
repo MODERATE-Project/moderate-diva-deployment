@@ -25,6 +25,9 @@ The `validate-config` task performs essential configuration validation to ensure
 ```bash
 cp .env.default .env
 # Edit .env - update MACHINE_URL, passwords, and environment values
+# Set Kafka REST Proxy basic auth: KAFKA_REST_BASIC_AUTH_USER and
+# KAFKA_REST_BASIC_AUTH_PASSWORD (hash computed automatically by the
+# start-caddy task for Caddy basic auth on kafka-rest.<MACHINE_URL>)
 task validate-config
 ```
 

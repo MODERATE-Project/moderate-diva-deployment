@@ -88,6 +88,14 @@ tasks:
     deps:
       - create-dirs
       - create-services-network
+    vars:
+      KAFKA_REST_BASIC_AUTH_PASSWORD_HASH:
+        sh: |
+          PASSWORD="{{.KAFKA_REST_BASIC_AUTH_PASSWORD}}"
+          docker run --rm caddy:2.8-alpine caddy hash-password --plaintext "$PASSWORD" | tr -d '\n'
+    env:
+      KAFKA_REST_BASIC_AUTH_USER: "{{.KAFKA_REST_BASIC_AUTH_USER}}"
+      KAFKA_REST_BASIC_AUTH_PASSWORD_HASH: "{{.KAFKA_REST_BASIC_AUTH_PASSWORD_HASH}}"
     cmds:
       - docker compose -f {{.CADDY_COMPOSE_FILE}} up -d --wait
 
