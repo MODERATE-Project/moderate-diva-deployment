@@ -223,3 +223,42 @@ tasks:
         ignore_error: true
       - cmd: cd {{.ROOT_DIR}}/{{.QUALITY_REPORTER_SETUP_DIR}} && docker compose down
         ignore_error: true
+
+  # =================================================================
+  # Development & Debugging Tools
+  # =================================================================
+
+  quality-report:
+    desc: "Fetch and display DQA validation report from Quality Reporter API"
+    vars:
+      QUALITY_REPORTER_URL: '{{.QUALITY_REPORTER_URL | default "http://localhost:8000"}}'
+    cmds:
+      - python3 {{.ROOT_DIR}}/scripts/quality_report_client.py --url {{.QUALITY_REPORTER_URL}} report {{.CLI_ARGS}}
+
+  quality-report-json:
+    desc: "Fetch DQA validation report as JSON"
+    vars:
+      QUALITY_REPORTER_URL: '{{.QUALITY_REPORTER_URL | default "http://localhost:8000"}}'
+    cmds:
+      - python3 {{.ROOT_DIR}}/scripts/quality_report_client.py --url {{.QUALITY_REPORTER_URL}} report --format json {{.CLI_ARGS}}
+
+  quality-report-summary:
+    desc: "Fetch DQA validation report grouped by validator"
+    vars:
+      QUALITY_REPORTER_URL: '{{.QUALITY_REPORTER_URL | default "http://localhost:8000"}}'
+    cmds:
+      - python3 {{.ROOT_DIR}}/scripts/quality_report_client.py --url {{.QUALITY_REPORTER_URL}} report --format summary {{.CLI_ARGS}}
+
+  quality-report-watch:
+    desc: "Continuously watch DQA validation updates (Ctrl+C to stop)"
+    vars:
+      QUALITY_REPORTER_URL: '{{.QUALITY_REPORTER_URL | default "http://localhost:8000"}}'
+    cmds:
+      - python3 {{.ROOT_DIR}}/scripts/quality_report_client.py --url {{.QUALITY_REPORTER_URL}} watch {{.CLI_ARGS}}
+
+  quality-report-clear:
+    desc: "Clear all DQA validation statistics from the database"
+    vars:
+      QUALITY_REPORTER_URL: '{{.QUALITY_REPORTER_URL | default "http://localhost:8000"}}'
+    cmds:
+      - python3 {{.ROOT_DIR}}/scripts/quality_report_client.py --url {{.QUALITY_REPORTER_URL}} clear {{.CLI_ARGS}}
