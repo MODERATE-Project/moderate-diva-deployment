@@ -227,12 +227,19 @@ class StandardValidator:
         values = self._get_values(sample, feature_path)
         min_value = specs.get("min")
         max_value = specs.get("max")
+        coerce_numeric_strings = specs.get("coerce_numeric_strings", False)
 
         for value in values:
             # Skip comparisons when value is None; treat as failing the check.
             if value is None:
                 checks.append(False)
                 continue
+            if coerce_numeric_strings and isinstance(value, str):
+                try:
+                    value = float(value) if "." in value or "e" in value.lower() else int(value)
+                except Exception:
+                    checks.append(False)
+                    continue
             if min_value is not None and max_value is not None:
                 checks.append(min_value <= value <= max_value)
             elif min_value is not None:
@@ -314,13 +321,36 @@ class StandardValidator:
         """
         values = self._get_values(sample, feature_path)
         data_type = specs["type"]
+        coerce_numeric_strings = specs.get("coerce_numeric_strings", False)
         checks = []
 
         for value in values:
             if data_type == "STRING":
                 checks.append(isinstance(value, str))
-            elif data_type in ["INTEGER", "FLOAT"]:
-                checks.append(isinstance(value, (int, float)))
+            elif data_type == "INTEGER":
+                if isinstance(value, int):
+                    checks.append(True)
+                    continue
+                if coerce_numeric_strings and isinstance(value, str):
+                    try:
+                        int(value)
+                        checks.append(True)
+                        continue
+                    except Exception:
+                        pass
+                checks.append(False)
+            elif data_type == "FLOAT":
+                if isinstance(value, (int, float)):
+                    checks.append(True)
+                    continue
+                if coerce_numeric_strings and isinstance(value, str):
+                    try:
+                        float(value)
+                        checks.append(True)
+                        continue
+                    except Exception:
+                        pass
+                checks.append(False)
             elif data_type == "BOOLEAN":
                 checks.append(isinstance(value, bool))
 
