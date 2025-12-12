@@ -29,8 +29,6 @@ services:
     networks:
       - default
       - services-network
-    ports:
-      - ${KEYCLOAK_HOST_PORT}:8080
     extra_hosts:
       - "host.docker.internal:host-gateway"
     command:
