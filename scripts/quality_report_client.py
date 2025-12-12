@@ -27,6 +27,7 @@ from urllib.parse import urljoin
 
 try:
     import requests
+    from requests.auth import HTTPBasicAuth
 except ImportError:
     print(
         "Error: 'requests' package is required. Install it with: pip install requests"
@@ -68,9 +69,19 @@ class ReportEntry:
 class QualityReporterClient:
     """Client for the Quality Reporter REST API."""
 
-    def __init__(self, base_url: str, timeout: int = 30):
+    def __init__(
+        self,
+        base_url: str,
+        timeout: int = 30,
+        basic_auth_user: Optional[str] = None,
+        basic_auth_password: Optional[str] = None,
+    ):
         self.base_url = base_url.rstrip("/")
         self.timeout = timeout
+        if basic_auth_user and basic_auth_password:
+            self.auth = HTTPBasicAuth(basic_auth_user, basic_auth_password)
+        else:
+            self.auth = None
 
     def get_report(self) -> list[ReportEntry]:
         """
@@ -83,7 +94,7 @@ class QualityReporterClient:
             requests.RequestException: If the API request fails.
         """
         url = urljoin(self.base_url + "/", "report")
-        response = requests.get(url, timeout=self.timeout)
+        response = requests.get(url, timeout=self.timeout, auth=self.auth)
         response.raise_for_status()
         data = response.json()
         return [ReportEntry.from_dict(entry) for entry in data]
@@ -99,7 +110,7 @@ class QualityReporterClient:
             requests.RequestException: If the API request fails.
         """
         url = urljoin(self.base_url + "/", "report")
-        response = requests.delete(url, timeout=self.timeout)
+        response = requests.delete(url, timeout=self.timeout, auth=self.auth)
         response.raise_for_status()
         return response.json()
 
@@ -306,6 +317,15 @@ def cmd_watch(args, client: QualityReporterClient):
 
 
 def main():
+    default_url = os.environ.get("QUALITY_REPORTER_URL")
+    if not default_url:
+        machine_url = os.environ.get("MACHINE_URL")
+        default_url = (
+            f"https://reporter.{machine_url}"
+            if machine_url
+            else "http://localhost:8000"
+        )
+
     parser = argparse.ArgumentParser(
         description="Quality Reporter API Client - Review DQA validation results",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -319,14 +339,29 @@ Examples:
   %(prog)s clear                          # Clear all validation data
 
 Environment Variables:
-  QUALITY_REPORTER_URL   Base URL of the Quality Reporter API (default: http://localhost:8000)
+  MACHINE_URL                   Used to infer default URL (https://reporter.<MACHINE_URL>)
+  QUALITY_REPORTER_URL           Base URL of the Quality Reporter API
+  CADDY_BASIC_AUTH_USER          Basic auth username for Caddy-protected endpoints
+  CADDY_BASIC_AUTH_PASSWORD      Basic auth password for Caddy-protected endpoints
 """,
     )
 
     parser.add_argument(
         "--url",
-        default=os.environ.get("QUALITY_REPORTER_URL", "http://localhost:8000"),
-        help="Quality Reporter API base URL (default: http://localhost:8000 or QUALITY_REPORTER_URL env var)",
+        default=default_url,
+        help="Quality Reporter API base URL (default: https://reporter.<MACHINE_URL> if set, else http://localhost:8000)",
+    )
+    parser.add_argument(
+        "--basic-user",
+        default=os.environ.get("CADDY_BASIC_AUTH_USER")
+        or os.environ.get("KAFKA_REST_BASIC_AUTH_USER"),
+        help="Basic auth username (default: from CADDY_BASIC_AUTH_USER)",
+    )
+    parser.add_argument(
+        "--basic-password",
+        default=os.environ.get("CADDY_BASIC_AUTH_PASSWORD")
+        or os.environ.get("KAFKA_REST_BASIC_AUTH_PASSWORD"),
+        help="Basic auth password (default: from CADDY_BASIC_AUTH_PASSWORD)",
     )
     parser.add_argument(
         "--timeout",
@@ -382,7 +417,12 @@ Environment Variables:
         parser.print_help()
         sys.exit(1)
 
-    client = QualityReporterClient(args.url, timeout=args.timeout)
+    client = QualityReporterClient(
+        args.url,
+        timeout=args.timeout,
+        basic_auth_user=args.basic_user,
+        basic_auth_password=args.basic_password,
+    )
 
     if args.command == "report":
         cmd_report(args, client)

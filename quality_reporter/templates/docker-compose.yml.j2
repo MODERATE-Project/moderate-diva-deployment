@@ -3,8 +3,8 @@ name: {{ general_vars.project_name }}-quality-reporter
 services:
   reporter:
     build: .
-    ports:
-      - 8000:8000
+    expose:
+      - "8000"
     environment:
       KAFKA_BOOTSTRAP_SERVERS: "{{ kafka_conf.kafka_bootstrap_srv }}"
       KAFKA_SASL_USERNAME: "{{ kafka_conf.kafka_sasl_usr }}"

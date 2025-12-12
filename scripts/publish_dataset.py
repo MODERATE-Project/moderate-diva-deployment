@@ -171,8 +171,10 @@ def get_env_config() -> dict:
 
     return {
         "kafka_rest_url": kafka_rest_url,
-        "username": os.environ.get("KAFKA_REST_BASIC_AUTH_USER"),
-        "password": os.environ.get("KAFKA_REST_BASIC_AUTH_PASSWORD"),
+        "username": os.environ.get("CADDY_BASIC_AUTH_USER")
+        or os.environ.get("KAFKA_REST_BASIC_AUTH_USER"),
+        "password": os.environ.get("CADDY_BASIC_AUTH_PASSWORD")
+        or os.environ.get("KAFKA_REST_BASIC_AUTH_PASSWORD"),
         "default_topic": os.environ.get(
             "KAFKA_INGESTION_TOPIC", "data-ingestion-trigger"
         ),
@@ -325,8 +327,8 @@ Examples:
 Environment Variables:
   MACHINE_URL                      Machine URL for building Kafka REST URL
   KAFKA_REST_URL                   Full Kafka REST Proxy URL (overrides MACHINE_URL)
-  KAFKA_REST_BASIC_AUTH_USER       Basic auth username
-  KAFKA_REST_BASIC_AUTH_PASSWORD   Basic auth password
+  CADDY_BASIC_AUTH_USER            Basic auth username for Caddy-protected endpoints
+  CADDY_BASIC_AUTH_PASSWORD        Basic auth password for Caddy-protected endpoints
   KAFKA_INGESTION_TOPIC            Default topic name (default: data-ingestion)
 
 JSON File Format (for --from-file):
@@ -346,13 +348,13 @@ JSON File Format (for --from-file):
         "--username",
         "-u",
         default=config["username"],
-        help="Basic auth username (default: from KAFKA_REST_BASIC_AUTH_USER)",
+        help="Basic auth username (default: from CADDY_BASIC_AUTH_USER)",
     )
     parser.add_argument(
         "--password",
         "-p",
         default=config["password"],
-        help="Basic auth password (default: from KAFKA_REST_BASIC_AUTH_PASSWORD)",
+        help="Basic auth password (default: from CADDY_BASIC_AUTH_PASSWORD)",
     )
     parser.add_argument(
         "--timeout",

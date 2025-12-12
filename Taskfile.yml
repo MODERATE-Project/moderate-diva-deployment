@@ -89,13 +89,13 @@ tasks:
       - create-dirs
       - create-services-network
     vars:
-      KAFKA_REST_BASIC_AUTH_PASSWORD_HASH:
+      CADDY_BASIC_AUTH_PASSWORD_HASH:
         sh: |
-          PASSWORD="{{.KAFKA_REST_BASIC_AUTH_PASSWORD}}"
+          PASSWORD="{{.CADDY_BASIC_AUTH_PASSWORD | default .KAFKA_REST_BASIC_AUTH_PASSWORD}}"
           docker run --rm caddy:2.8-alpine caddy hash-password --plaintext "$PASSWORD" | tr -d '\n'
     env:
-      KAFKA_REST_BASIC_AUTH_USER: "{{.KAFKA_REST_BASIC_AUTH_USER}}"
-      KAFKA_REST_BASIC_AUTH_PASSWORD_HASH: "{{.KAFKA_REST_BASIC_AUTH_PASSWORD_HASH}}"
+      CADDY_BASIC_AUTH_USER: "{{.CADDY_BASIC_AUTH_USER | default .KAFKA_REST_BASIC_AUTH_USER}}"
+      CADDY_BASIC_AUTH_PASSWORD_HASH: "{{.CADDY_BASIC_AUTH_PASSWORD_HASH}}"
     cmds:
       - docker compose -f {{.CADDY_COMPOSE_FILE}} up -d --wait
 
@@ -239,35 +239,65 @@ tasks:
   quality-report:
     desc: "Fetch and display DQA validation report from Quality Reporter API"
     vars:
-      QUALITY_REPORTER_URL: '{{.QUALITY_REPORTER_URL | default "http://localhost:8000"}}'
+      QUALITY_REPORTER_URL: '{{.QUALITY_REPORTER_URL | default (printf "https://reporter.%s" .MACHINE_URL)}}'
+      CADDY_BASIC_AUTH_USER: '{{.CADDY_BASIC_AUTH_USER | default .KAFKA_REST_BASIC_AUTH_USER | default ""}}'
+      CADDY_BASIC_AUTH_PASSWORD: '{{.CADDY_BASIC_AUTH_PASSWORD | default .KAFKA_REST_BASIC_AUTH_PASSWORD | default ""}}'
+    env:
+      QUALITY_REPORTER_URL: "{{.QUALITY_REPORTER_URL}}"
+      CADDY_BASIC_AUTH_USER: "{{.CADDY_BASIC_AUTH_USER}}"
+      CADDY_BASIC_AUTH_PASSWORD: "{{.CADDY_BASIC_AUTH_PASSWORD}}"
     cmds:
       - python3 {{.ROOT_DIR}}/scripts/quality_report_client.py --url {{.QUALITY_REPORTER_URL}} report {{.CLI_ARGS}}
 
   quality-report-json:
     desc: "Fetch DQA validation report as JSON"
     vars:
-      QUALITY_REPORTER_URL: '{{.QUALITY_REPORTER_URL | default "http://localhost:8000"}}'
+      QUALITY_REPORTER_URL: '{{.QUALITY_REPORTER_URL | default (printf "https://reporter.%s" .MACHINE_URL)}}'
+      CADDY_BASIC_AUTH_USER: '{{.CADDY_BASIC_AUTH_USER | default .KAFKA_REST_BASIC_AUTH_USER | default ""}}'
+      CADDY_BASIC_AUTH_PASSWORD: '{{.CADDY_BASIC_AUTH_PASSWORD | default .KAFKA_REST_BASIC_AUTH_PASSWORD | default ""}}'
+    env:
+      QUALITY_REPORTER_URL: "{{.QUALITY_REPORTER_URL}}"
+      CADDY_BASIC_AUTH_USER: "{{.CADDY_BASIC_AUTH_USER}}"
+      CADDY_BASIC_AUTH_PASSWORD: "{{.CADDY_BASIC_AUTH_PASSWORD}}"
     cmds:
       - python3 {{.ROOT_DIR}}/scripts/quality_report_client.py --url {{.QUALITY_REPORTER_URL}} report --format json {{.CLI_ARGS}}
 
   quality-report-summary:
     desc: "Fetch DQA validation report grouped by validator"
     vars:
-      QUALITY_REPORTER_URL: '{{.QUALITY_REPORTER_URL | default "http://localhost:8000"}}'
+      QUALITY_REPORTER_URL: '{{.QUALITY_REPORTER_URL | default (printf "https://reporter.%s" .MACHINE_URL)}}'
+      CADDY_BASIC_AUTH_USER: '{{.CADDY_BASIC_AUTH_USER | default .KAFKA_REST_BASIC_AUTH_USER | default ""}}'
+      CADDY_BASIC_AUTH_PASSWORD: '{{.CADDY_BASIC_AUTH_PASSWORD | default .KAFKA_REST_BASIC_AUTH_PASSWORD | default ""}}'
+    env:
+      QUALITY_REPORTER_URL: "{{.QUALITY_REPORTER_URL}}"
+      CADDY_BASIC_AUTH_USER: "{{.CADDY_BASIC_AUTH_USER}}"
+      CADDY_BASIC_AUTH_PASSWORD: "{{.CADDY_BASIC_AUTH_PASSWORD}}"
     cmds:
       - python3 {{.ROOT_DIR}}/scripts/quality_report_client.py --url {{.QUALITY_REPORTER_URL}} report --format summary {{.CLI_ARGS}}
 
   quality-report-watch:
     desc: "Continuously watch DQA validation updates (Ctrl+C to stop)"
     vars:
-      QUALITY_REPORTER_URL: '{{.QUALITY_REPORTER_URL | default "http://localhost:8000"}}'
+      QUALITY_REPORTER_URL: '{{.QUALITY_REPORTER_URL | default (printf "https://reporter.%s" .MACHINE_URL)}}'
+      CADDY_BASIC_AUTH_USER: '{{.CADDY_BASIC_AUTH_USER | default .KAFKA_REST_BASIC_AUTH_USER | default ""}}'
+      CADDY_BASIC_AUTH_PASSWORD: '{{.CADDY_BASIC_AUTH_PASSWORD | default .KAFKA_REST_BASIC_AUTH_PASSWORD | default ""}}'
+    env:
+      QUALITY_REPORTER_URL: "{{.QUALITY_REPORTER_URL}}"
+      CADDY_BASIC_AUTH_USER: "{{.CADDY_BASIC_AUTH_USER}}"
+      CADDY_BASIC_AUTH_PASSWORD: "{{.CADDY_BASIC_AUTH_PASSWORD}}"
     cmds:
       - python3 {{.ROOT_DIR}}/scripts/quality_report_client.py --url {{.QUALITY_REPORTER_URL}} watch {{.CLI_ARGS}}
 
   quality-report-clear:
     desc: "Clear all DQA validation statistics from the database"
     vars:
-      QUALITY_REPORTER_URL: '{{.QUALITY_REPORTER_URL | default "http://localhost:8000"}}'
+      QUALITY_REPORTER_URL: '{{.QUALITY_REPORTER_URL | default (printf "https://reporter.%s" .MACHINE_URL)}}'
+      CADDY_BASIC_AUTH_USER: '{{.CADDY_BASIC_AUTH_USER | default .KAFKA_REST_BASIC_AUTH_USER | default ""}}'
+      CADDY_BASIC_AUTH_PASSWORD: '{{.CADDY_BASIC_AUTH_PASSWORD | default .KAFKA_REST_BASIC_AUTH_PASSWORD | default ""}}'
+    env:
+      QUALITY_REPORTER_URL: "{{.QUALITY_REPORTER_URL}}"
+      CADDY_BASIC_AUTH_USER: "{{.CADDY_BASIC_AUTH_USER}}"
+      CADDY_BASIC_AUTH_PASSWORD: "{{.CADDY_BASIC_AUTH_PASSWORD}}"
     cmds:
       - python3 {{.ROOT_DIR}}/scripts/quality_report_client.py --url {{.QUALITY_REPORTER_URL}} clear {{.CLI_ARGS}}
 
@@ -275,13 +305,13 @@ tasks:
     desc: "Publish a dataset ingestion request to Kafka via REST Proxy"
     vars:
       KAFKA_REST_URL: '{{.KAFKA_REST_URL | default (printf "https://kafka-rest.%s" .MACHINE_URL)}}'
-      KAFKA_REST_BASIC_AUTH_USER: '{{.KAFKA_REST_BASIC_AUTH_USER | default ""}}'
-      KAFKA_REST_BASIC_AUTH_PASSWORD: '{{.KAFKA_REST_BASIC_AUTH_PASSWORD | default ""}}'
+      CADDY_BASIC_AUTH_USER: '{{.CADDY_BASIC_AUTH_USER | default .KAFKA_REST_BASIC_AUTH_USER | default ""}}'
+      CADDY_BASIC_AUTH_PASSWORD: '{{.CADDY_BASIC_AUTH_PASSWORD | default .KAFKA_REST_BASIC_AUTH_PASSWORD | default ""}}'
       KAFKA_INGESTION_TOPIC: '{{.KAFKA_INGESTION_TOPIC | default "data-ingestion-trigger"}}'
     env:
       KAFKA_REST_URL: "{{.KAFKA_REST_URL}}"
-      KAFKA_REST_BASIC_AUTH_USER: "{{.KAFKA_REST_BASIC_AUTH_USER}}"
-      KAFKA_REST_BASIC_AUTH_PASSWORD: "{{.KAFKA_REST_BASIC_AUTH_PASSWORD}}"
+      CADDY_BASIC_AUTH_USER: "{{.CADDY_BASIC_AUTH_USER}}"
+      CADDY_BASIC_AUTH_PASSWORD: "{{.CADDY_BASIC_AUTH_PASSWORD}}"
       KAFKA_INGESTION_TOPIC: "{{.KAFKA_INGESTION_TOPIC}}"
     cmds:
       - python3 {{.ROOT_DIR}}/scripts/publish_dataset.py publish {{.CLI_ARGS}}
@@ -290,13 +320,13 @@ tasks:
     desc: "Show what would be published without actually publishing"
     vars:
       KAFKA_REST_URL: '{{.KAFKA_REST_URL | default (printf "https://kafka-rest.%s" .MACHINE_URL)}}'
-      KAFKA_REST_BASIC_AUTH_USER: '{{.KAFKA_REST_BASIC_AUTH_USER | default ""}}'
-      KAFKA_REST_BASIC_AUTH_PASSWORD: '{{.KAFKA_REST_BASIC_AUTH_PASSWORD | default ""}}'
+      CADDY_BASIC_AUTH_USER: '{{.CADDY_BASIC_AUTH_USER | default .KAFKA_REST_BASIC_AUTH_USER | default ""}}'
+      CADDY_BASIC_AUTH_PASSWORD: '{{.CADDY_BASIC_AUTH_PASSWORD | default .KAFKA_REST_BASIC_AUTH_PASSWORD | default ""}}'
       KAFKA_INGESTION_TOPIC: '{{.KAFKA_INGESTION_TOPIC | default "data-ingestion-trigger"}}'
     env:
       KAFKA_REST_URL: "{{.KAFKA_REST_URL}}"
-      KAFKA_REST_BASIC_AUTH_USER: "{{.KAFKA_REST_BASIC_AUTH_USER}}"
-      KAFKA_REST_BASIC_AUTH_PASSWORD: "{{.KAFKA_REST_BASIC_AUTH_PASSWORD}}"
+      CADDY_BASIC_AUTH_USER: "{{.CADDY_BASIC_AUTH_USER}}"
+      CADDY_BASIC_AUTH_PASSWORD: "{{.CADDY_BASIC_AUTH_PASSWORD}}"
       KAFKA_INGESTION_TOPIC: "{{.KAFKA_INGESTION_TOPIC}}"
     cmds:
       - python3 {{.ROOT_DIR}}/scripts/publish_dataset.py publish --dry-run {{.CLI_ARGS}}
@@ -305,12 +335,12 @@ tasks:
     desc: "List available Kafka topics via REST Proxy"
     vars:
       KAFKA_REST_URL: '{{.KAFKA_REST_URL | default (printf "https://kafka-rest.%s" .MACHINE_URL)}}'
-      KAFKA_REST_BASIC_AUTH_USER: '{{.KAFKA_REST_BASIC_AUTH_USER | default ""}}'
-      KAFKA_REST_BASIC_AUTH_PASSWORD: '{{.KAFKA_REST_BASIC_AUTH_PASSWORD | default ""}}'
+      CADDY_BASIC_AUTH_USER: '{{.CADDY_BASIC_AUTH_USER | default .KAFKA_REST_BASIC_AUTH_USER | default ""}}'
+      CADDY_BASIC_AUTH_PASSWORD: '{{.CADDY_BASIC_AUTH_PASSWORD | default .KAFKA_REST_BASIC_AUTH_PASSWORD | default ""}}'
     env:
       KAFKA_REST_URL: "{{.KAFKA_REST_URL}}"
-      KAFKA_REST_BASIC_AUTH_USER: "{{.KAFKA_REST_BASIC_AUTH_USER}}"
-      KAFKA_REST_BASIC_AUTH_PASSWORD: "{{.KAFKA_REST_BASIC_AUTH_PASSWORD}}"
+      CADDY_BASIC_AUTH_USER: "{{.CADDY_BASIC_AUTH_USER}}"
+      CADDY_BASIC_AUTH_PASSWORD: "{{.CADDY_BASIC_AUTH_PASSWORD}}"
     cmds:
       - python3 {{.ROOT_DIR}}/scripts/publish_dataset.py list-topics {{.CLI_ARGS}}
 
@@ -318,11 +348,11 @@ tasks:
     desc: "Get information about a Kafka topic"
     vars:
       KAFKA_REST_URL: '{{.KAFKA_REST_URL | default (printf "https://kafka-rest.%s" .MACHINE_URL)}}'
-      KAFKA_REST_BASIC_AUTH_USER: '{{.KAFKA_REST_BASIC_AUTH_USER | default ""}}'
-      KAFKA_REST_BASIC_AUTH_PASSWORD: '{{.KAFKA_REST_BASIC_AUTH_PASSWORD | default ""}}'
+      CADDY_BASIC_AUTH_USER: '{{.CADDY_BASIC_AUTH_USER | default .KAFKA_REST_BASIC_AUTH_USER | default ""}}'
+      CADDY_BASIC_AUTH_PASSWORD: '{{.CADDY_BASIC_AUTH_PASSWORD | default .KAFKA_REST_BASIC_AUTH_PASSWORD | default ""}}'
     env:
       KAFKA_REST_URL: "{{.KAFKA_REST_URL}}"
-      KAFKA_REST_BASIC_AUTH_USER: "{{.KAFKA_REST_BASIC_AUTH_USER}}"
-      KAFKA_REST_BASIC_AUTH_PASSWORD: "{{.KAFKA_REST_BASIC_AUTH_PASSWORD}}"
+      CADDY_BASIC_AUTH_USER: "{{.CADDY_BASIC_AUTH_USER}}"
+      CADDY_BASIC_AUTH_PASSWORD: "{{.CADDY_BASIC_AUTH_PASSWORD}}"
     cmds:
       - python3 {{.ROOT_DIR}}/scripts/publish_dataset.py topic-info {{.CLI_ARGS}}
