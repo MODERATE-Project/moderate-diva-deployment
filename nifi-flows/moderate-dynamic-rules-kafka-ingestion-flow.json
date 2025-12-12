@@ -81,8 +81,8 @@
                 "name": "PublishKafka INVALID",
                 "comments": "",
                 "position": {
-                    "x": 1608.0,
-                    "y": -200.0
+                    "x": 1632.0,
+                    "y": -16.0
                 },
                 "type": "org.apache.nifi.kafka.processors.PublishKafka",
                 "bundle": {
@@ -738,7 +738,7 @@
                 "name": "PublishKafka Unmatched JSON",
                 "comments": "",
                 "position": {
-                    "x": -384.0,
+                    "x": -360.0,
                     "y": 192.0
                 },
                 "type": "org.apache.nifi.kafka.processors.PublishKafka",
@@ -1034,7 +1034,7 @@
                 "name": "ConsumeKafka",
                 "comments": "",
                 "position": {
-                    "x": 256.0,
+                    "x": 288.0,
                     "y": 432.0
                 },
                 "type": "org.apache.nifi.kafka.processors.ConsumeKafka",
@@ -1431,7 +1431,7 @@
                 "name": "EvaluateJsonPath",
                 "comments": "",
                 "position": {
-                    "x": -384.0,
+                    "x": -360.0,
                     "y": 432.0
                 },
                 "type": "org.apache.nifi.processors.standard.EvaluateJsonPath",
@@ -1526,8 +1526,8 @@
                 "name": "PublishKafka VALIDATION",
                 "comments": "",
                 "position": {
-                    "x": 1608.0,
-                    "y": 152.0
+                    "x": 952.0,
+                    "y": 280.0
                 },
                 "type": "org.apache.nifi.kafka.processors.PublishKafka",
                 "bundle": {
