@@ -173,16 +173,23 @@ class TopicStats():
             logger.error(f"Database error in bulk upsert: {e}")
             db.rollback()
 
-    def get_report(self):
+    def get_report(self, validator: str | None = None):
         """It returns the information about all the simulation requests read by the backend.
+
+        Args:
+            validator: Optional validator name to filter results by. If None,
+                all records are returned.
 
         Returns:
             list: A list of dictionaries, each containing report statistics.
         """
         try:
             with Session(self.engine) as db:
-                items = db.query(self.Report).all()
-                
+                query = db.query(self.Report)
+                if validator is not None:
+                    query = query.filter(self.Report.validator == validator)
+                items = query.all()
+
                 return [
                     {
                         "validator": report.validator,
@@ -193,7 +200,7 @@ class TopicStats():
                     }
                     for report in items
                 ]
-                
+
         except SQLAlchemyError as e:
             logger.error(f"Database error getting report: {e}")
             return {}
