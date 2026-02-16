@@ -198,6 +198,14 @@ tasks:
     cmds:
       - ansible-playbook -K ansible-plb.yml
 
+  deploy-quality-reporter:
+    desc: "Deploy only the Quality Reporter container (rebuild and up)"
+    deps:
+      - process-configuration-templates
+    dir: "{{.ANSIBLE_CONFIGURATOR_DIR}}"
+    cmds:
+      - ansible-playbook -K Quality_Reporter/ansible-plb.yml
+
   down:
     desc: "Stop and remove all DIVA services"
     dir: "{{.ANSIBLE_CONFIGURATOR_DIR}}"
