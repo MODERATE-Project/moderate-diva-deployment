@@ -16,6 +16,10 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 import logging
 logger = logging.getLogger(__name__)
 
+_RECONNECT_INITIAL_DELAY = 1.0   # seconds
+_RECONNECT_MAX_DELAY = 60.0
+_RECONNECT_BACKOFF_FACTOR = 2.0
+
 class TopicStats():
     """It stores the statistics computed on the messages read by Kafka.
     When a new message available, the backend computes the GUI 
@@ -216,54 +220,58 @@ class TopicStats():
 
     def _compute_stats_loop(self):
         """Internal method that runs in background thread to process Kafka messages."""
-        try:
-            kfg_valid = KafkaCommunicationGateway(
-                os.getenv("HOSTNAME"), 
-                settings.validation_topic,
-                settings.broker,
-                settings.security_protocol,
-                settings.mechanism,
-                settings.sasl_username,
-                settings.sasl_password,
-                settings.kafka_server_certificate_location)
-        except Exception as e:
-            logger.error(f"Failed to initialize Kafka gateway: {e}")
-            self.running = False
-            return
-        
-        logger.info("Starting stats computation loop with batch processing...")
-        
+        kfg_valid = None
         message_batch = []
         last_flush_time = time.time()
-        
+        backoff = _RECONNECT_INITIAL_DELAY
+
         while self.running:
+
+            # ── Phase A: connect (or reconnect) ───────────────────────────────
+            if kfg_valid is None:
+                try:
+                    kfg_valid = KafkaCommunicationGateway(
+                        os.getenv("HOSTNAME"),
+                        settings.validation_topic,
+                        settings.broker,
+                        settings.security_protocol,
+                        settings.mechanism,
+                        settings.sasl_username,
+                        settings.sasl_password,
+                        settings.kafka_server_certificate_location,
+                    )
+                    logger.info("Connected to Kafka broker.")
+                    backoff = _RECONNECT_INITIAL_DELAY
+                except Exception as e:
+                    logger.error(f"Kafka connection failed: {e}. Retrying in {backoff:.1f}s.")
+                    time.sleep(backoff)
+                    backoff = min(backoff * _RECONNECT_BACKOFF_FACTOR, _RECONNECT_MAX_DELAY)
+                    continue
+
+            # ── Phase B: poll and batch ────────────────────────────────────────
             try:
                 messages = kfg_valid.receive()
-                
+
                 if messages:
                     message_batch.extend(messages)
-                    
-                    # Flush batch if size threshold reached
                     if len(message_batch) >= self.batch_size:
                         self._batch_update(message_batch)
                         message_batch = []
                         last_flush_time = time.time()
-                
-                # Flush batch if timeout reached
+
                 current_time = time.time()
                 if message_batch and (current_time - last_flush_time) >= self.batch_timeout:
                     self._batch_update(message_batch)
                     message_batch = []
                     last_flush_time = current_time
-                
+
             except Exception as e:
-                logger.error(f"Error receiving messages from Kafka: {e}")
-                time.sleep(1)
-        
+                logger.error(f"Kafka receive error: {e}. Will reconnect.")
+                kfg_valid = None
+
         # Flush any remaining messages before shutdown
         if message_batch:
             self._batch_update(message_batch)
-        
         logger.info("Stats computation loop ended.")
 
     def shutdown(self):
