@@ -171,6 +171,13 @@ tasks:
     cmds:
       - ./scripts/verify-certificates.sh
 
+  renew-certificates:
+    desc: "Update certificates from Caddy and restart Kafka and NiFi to apply them"
+    cmds:
+      - task: update-certificates
+      - docker compose -f {{.ROOT_DIR}}/{{.KAFKA_SETUP_DIR}}/docker-compose.yml restart kafka1
+      - docker compose -f {{.ROOT_DIR}}/{{.NIFI_SETUP_DIR}}/docker-compose.yml restart nifi
+
   # =================================================================
   # Configuration Processing
   # =================================================================
