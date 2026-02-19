@@ -75,6 +75,7 @@ services:
   # Schema Registry service
   schema-registry:
     image: confluentinc/cp-schema-registry:7.0.1
+    restart: unless-stopped
     hostname: schema-registry
     container_name: schema-registry
     depends_on:
@@ -102,6 +103,7 @@ services:
   # ksqlDB Server service
   ksqldb-server:
     image: confluentinc/cp-ksqldb-server:7.0.1
+    restart: unless-stopped
     hostname: ksqldb-server
     container_name: ksqldb-server
     depends_on:
@@ -136,6 +138,7 @@ services:
   # Kafka REST Proxy service
   rest-proxy:
     image: confluentinc/cp-kafka-rest:7.0.1
+    restart: unless-stopped
     depends_on:
       kafka1:
         condition: service_healthy

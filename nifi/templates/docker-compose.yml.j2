@@ -2,6 +2,7 @@ name: {{ general_vars.project_name }}-nifi
 services:
   nifi:
     image: docker.io/apache/nifi:2.6.0
+    restart: unless-stopped
     # Port mapping removed - NiFi accessed via Caddy reverse proxy
     # Internal HTTPS port 8443 available within Docker network
     volumes:
