@@ -7,7 +7,7 @@ import threading
 import time
 from collections import defaultdict
 
-from sqlalchemy import create_engine, Column, Integer, String, MetaData, tuple_
+from sqlalchemy import create_engine, Column, Integer, String, MetaData
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.exc import SQLAlchemyError
@@ -30,12 +30,11 @@ class TopicStats():
             batch_size: Number of messages to batch before DB update (default: 100)
             batch_timeout: Max seconds to wait before flushing batch (default: 1.0)
         """
-        self.engine = create_engine(
-            settings.database,
-            pool_size=10,
-            max_overflow=20,
-            pool_pre_ping=True
-        )
+        engine_kwargs: dict = {"pool_pre_ping": True}
+        if not settings.database.startswith("sqlite"):
+            engine_kwargs["pool_size"] = 10
+            engine_kwargs["max_overflow"] = 20
+        self.engine = create_engine(settings.database, **engine_kwargs)
         self.metadata = MetaData()
         self.session = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
         self.Base = declarative_base(metadata=self.metadata)
@@ -142,36 +141,30 @@ class TopicStats():
                         )
                         db.execute(stmt)
                 else:
-                    # Fallback for other databases: fetch existing records and update
-                    keys = list(updates.keys())
-                    existing = {
-                        (r.validator, r.rule, r.feature): r
-                        for r in db.query(self.Report).filter(
-                            tuple_(self.Report.validator, self.Report.rule, self.Report.feature).in_(keys)
-                        ).all()
-                    }
-                    
+                    # Fallback for other databases: fetch-then-update per record
                     for (validator, rule, feature), counts in updates.items():
-                        key = (validator, rule, feature)
-                        if key in existing:
-                            existing[key].valid += counts['valid']
-                            existing[key].fail += counts['fail']
+                        existing = db.query(self.Report).filter_by(
+                            validator=validator,
+                            rule=rule,
+                            feature=feature
+                        ).first()
+                        if existing:
+                            existing.valid += counts['valid']
+                            existing.fail += counts['fail']
                         else:
-                            report = self.Report(
+                            db.add(self.Report(
                                 validator=validator,
                                 rule=rule,
                                 feature=feature,
                                 valid=counts['valid'],
                                 fail=counts['fail']
-                            )
-                            db.add(report)
+                            ))
                 
                 db.commit()
                 logger.debug(f"Batch updated {len(updates)} report entries")
                 
         except SQLAlchemyError as e:
             logger.error(f"Database error in bulk upsert: {e}")
-            db.rollback()
 
     def get_report(self, validator: str | None = None):
         """It returns the information about all the simulation requests read by the backend.
@@ -219,7 +212,6 @@ class TopicStats():
                 return num_deleted
         except SQLAlchemyError as e:
             logger.error(f"Database error while clearing report table: {e}")
-            db.rollback()
             return 0
 
     def _compute_stats_loop(self):

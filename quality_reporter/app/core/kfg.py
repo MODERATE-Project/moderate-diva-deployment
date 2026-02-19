@@ -1,7 +1,6 @@
 from kafka import KafkaProducer, KafkaConsumer
 import ssl
 from kafka.errors import KafkaError
-from kafka.structs import TopicPartition
 
 import os
 import time
@@ -33,7 +32,6 @@ class KafkaCommunicationGateway:
             topic (str): name of the topic.
         """
 
-        partition = TopicPartition(topic, 0)
         self.topic = topic
         self.broker = broker
         self.security_protocol = security_protocol
@@ -46,7 +44,7 @@ class KafkaCommunicationGateway:
         self.context.verify_mode = ssl.CERT_REQUIRED
         
         self.consumer = self.config_consumer(name)
-        self.consumer.assign([partition])
+        self.consumer.subscribe([topic])
 
 
     def config_consumer(self, name: str):
@@ -86,6 +84,13 @@ class KafkaCommunicationGateway:
             for message in message_list:
                 if message is not None:
                     try:
+                        # Skip Kafka transaction control records (commit/abort markers).
+                        # These are emitted by transactional producers (e.g. NiFi
+                        # PublishKafka with Transactions Enabled) and start with a
+                        # null byte, making them invalid JSON.
+                        if message.value and message.value[0] == 0:
+                            continue
+
                         # Decode the message value
                         decoded_value = message.value.decode('utf-8')
                         
