@@ -3,6 +3,7 @@ import hashlib
 import io
 import json
 import random
+import threading
 from enum import Enum
 from collections import Counter, defaultdict
 from typing import Any, Dict, List, Optional, Set
@@ -488,7 +489,12 @@ class RuleBuilderProcessor(FlowFileTransform):
     relationships = [SUCCESS_REL, FAILURE_REL]
 
     def __init__(self, **kwargs):
-        pass
+        self._rule_cache: Dict[str, str] = {}
+        self._rule_cache_lock = threading.RLock()
+        self._handlers = {
+            Format.JSON: JsonHandler(),
+            Format.CSV: CsvHandler(),
+        }
 
     def onScheduled(self, context):
         """Load processor configuration and initialize caches/handlers."""
@@ -518,8 +524,11 @@ class RuleBuilderProcessor(FlowFileTransform):
         self.format_setting = (
             context.getProperty(self.FORMAT).getValue() or Format.AUTO.value
         )
-        # In-memory cache keyed by dataset+fingerprint to avoid re-sampling in the same JVM
+        # In-memory cache keyed by dataset+fingerprint to avoid re-sampling in
+        # the same JVM. Access stays behind a lock because NiFi may invoke
+        # transform() concurrently on the same processor instance.
         self._rule_cache: Dict[str, str] = {}
+        self._rule_cache_lock = threading.RLock()
         self._handlers = {
             Format.JSON: JsonHandler(),
             Format.CSV: CsvHandler(),
@@ -550,22 +559,7 @@ class RuleBuilderProcessor(FlowFileTransform):
                 fingerprint = handler.fingerprint(content_str)
 
             cache_key = f"{dataset_id}:{fingerprint}"
-
-            if cache_key in self._rule_cache:
-                rule_yaml = self._rule_cache[cache_key]
-            else:
-                records = handler.parse_records(
-                    content_str,
-                    self.sample_percent,
-                    self.min_sample_size,
-                    self.max_sample_size,
-                    self.sample_size,
-                )
-                sampled_count = len(records)
-                thresholds = self._derive_thresholds(sampled_count)
-                stats = self._collect_stats(records)
-                rule_yaml = self._build_rules_yaml(stats, thresholds)
-                self._rule_cache[cache_key] = rule_yaml
+            rule_yaml = self._get_or_build_rule_yaml(cache_key, content_str, handler)
 
             new_attrs = dict(attrs)
             new_attrs["dqa.rules"] = rule_yaml
@@ -580,6 +574,42 @@ class RuleBuilderProcessor(FlowFileTransform):
         except Exception as exc:
             self.logger.error(f"RuleBuilderProcessor failed: {exc}")
             return FlowFileTransformResult(relationship="failure")
+
+    def _get_or_build_rule_yaml(
+        self, cache_key: str, content: str, handler: FormatHandler
+    ) -> str:
+        """
+        Return cached rules when present, otherwise build them and populate the
+        cache. Rule generation happens outside the lock so unrelated FlowFiles
+        can still be processed concurrently.
+        """
+        with self._rule_cache_lock:
+            cached = self._rule_cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        rule_yaml = self._build_rule_yaml_for_content(content, handler)
+
+        with self._rule_cache_lock:
+            cached = self._rule_cache.get(cache_key)
+            if cached is not None:
+                return cached
+            self._rule_cache[cache_key] = rule_yaml
+            return rule_yaml
+
+    def _build_rule_yaml_for_content(self, content: str, handler: FormatHandler) -> str:
+        """Build rule YAML for a FlowFile payload using the configured sampler."""
+        records = handler.parse_records(
+            content,
+            self.sample_percent,
+            self.min_sample_size,
+            self.max_sample_size,
+            self.sample_size,
+        )
+        sampled_count = len(records)
+        thresholds = self._derive_thresholds(sampled_count)
+        stats = self._collect_stats(records)
+        return self._build_rules_yaml(stats, thresholds)
 
     def _detect_format(self, content: str, setting: str) -> Format:
         """Resolve format from setting or handler detection."""
