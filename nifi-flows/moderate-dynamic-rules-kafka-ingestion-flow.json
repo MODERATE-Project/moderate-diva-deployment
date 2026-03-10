@@ -61,8 +61,8 @@
                 "penaltyDuration": "30 sec",
                 "yieldDuration": "1 sec",
                 "bulletinLevel": "WARN",
-                "runDurationMillis": 0,
-                "concurrentlySchedulableTaskCount": 1,
+                "runDurationMillis": 25,
+                "concurrentlySchedulableTaskCount": 4,
                 "autoTerminatedRelationships": [
                     "original",
                     "failure"
@@ -270,7 +270,7 @@
                 "yieldDuration": "1 sec",
                 "bulletinLevel": "WARN",
                 "runDurationMillis": 0,
-                "concurrentlySchedulableTaskCount": 1,
+                "concurrentlySchedulableTaskCount": 4,
                 "autoTerminatedRelationships": [
                     "success",
                     "failure"
@@ -717,7 +717,7 @@
                 "yieldDuration": "1 sec",
                 "bulletinLevel": "WARN",
                 "runDurationMillis": 0,
-                "concurrentlySchedulableTaskCount": 1,
+                "concurrentlySchedulableTaskCount": 3,
                 "autoTerminatedRelationships": [
                     "No Retry",
                     "Retry",
@@ -927,7 +927,7 @@
                 "yieldDuration": "1 sec",
                 "bulletinLevel": "WARN",
                 "runDurationMillis": 0,
-                "concurrentlySchedulableTaskCount": 1,
+                "concurrentlySchedulableTaskCount": 4,
                 "autoTerminatedRelationships": [
                     "success",
                     "failure"
@@ -1412,7 +1412,7 @@
                 "yieldDuration": "1 sec",
                 "bulletinLevel": "WARN",
                 "runDurationMillis": 0,
-                "concurrentlySchedulableTaskCount": 1,
+                "concurrentlySchedulableTaskCount": 4,
                 "autoTerminatedRelationships": [
                     "success",
                     "failure"
@@ -1508,7 +1508,7 @@
                 "yieldDuration": "1 sec",
                 "bulletinLevel": "WARN",
                 "runDurationMillis": 0,
-                "concurrentlySchedulableTaskCount": 1,
+                "concurrentlySchedulableTaskCount": 4,
                 "autoTerminatedRelationships": [
                     "failure"
                 ],
@@ -1715,7 +1715,7 @@
                 "yieldDuration": "1 sec",
                 "bulletinLevel": "WARN",
                 "runDurationMillis": 0,
-                "concurrentlySchedulableTaskCount": 1,
+                "concurrentlySchedulableTaskCount": 4,
                 "autoTerminatedRelationships": [
                     "success",
                     "failure"
@@ -1923,7 +1923,7 @@
                 "yieldDuration": "1 sec",
                 "bulletinLevel": "WARN",
                 "runDurationMillis": 0,
-                "concurrentlySchedulableTaskCount": 1,
+                "concurrentlySchedulableTaskCount": 4,
                 "autoTerminatedRelationships": [
                     "success",
                     "failure"
@@ -2131,7 +2131,7 @@
                 "yieldDuration": "1 sec",
                 "bulletinLevel": "WARN",
                 "runDurationMillis": 0,
-                "concurrentlySchedulableTaskCount": 1,
+                "concurrentlySchedulableTaskCount": 4,
                 "autoTerminatedRelationships": [
                     "success",
                     "failure"
@@ -2267,7 +2267,7 @@
                 "yieldDuration": "1 sec",
                 "bulletinLevel": "WARN",
                 "runDurationMillis": 25,
-                "concurrentlySchedulableTaskCount": 1,
+                "concurrentlySchedulableTaskCount": 4,
                 "autoTerminatedRelationships": [],
                 "scheduledState": "ENABLED",
                 "retryCount": 10,
@@ -2307,7 +2307,7 @@
                     "valid",
                     "invalid"
                 ],
-                "backPressureObjectThreshold": 10000,
+                "backPressureObjectThreshold": 50000,
                 "backPressureDataSizeThreshold": "1 GB",
                 "flowFileExpiration": "0 sec",
                 "prioritizers": [],
@@ -2343,7 +2343,7 @@
                 "selectedRelationships": [
                     "success"
                 ],
-                "backPressureObjectThreshold": 10000,
+                "backPressureObjectThreshold": 50000,
                 "backPressureDataSizeThreshold": "1 GB",
                 "flowFileExpiration": "0 sec",
                 "prioritizers": [],
@@ -2451,7 +2451,7 @@
                 "selectedRelationships": [
                     "success"
                 ],
-                "backPressureObjectThreshold": 10000,
+                "backPressureObjectThreshold": 50000,
                 "backPressureDataSizeThreshold": "1 GB",
                 "flowFileExpiration": "0 sec",
                 "prioritizers": [],
@@ -2487,7 +2487,7 @@
                 "selectedRelationships": [
                     "valid"
                 ],
-                "backPressureObjectThreshold": 10000,
+                "backPressureObjectThreshold": 50000,
                 "backPressureDataSizeThreshold": "1 GB",
                 "flowFileExpiration": "0 sec",
                 "prioritizers": [],
@@ -2523,7 +2523,7 @@
                 "selectedRelationships": [
                     "splits"
                 ],
-                "backPressureObjectThreshold": 10000,
+                "backPressureObjectThreshold": 50000,
                 "backPressureDataSizeThreshold": "1 GB",
                 "flowFileExpiration": "0 sec",
                 "prioritizers": [],
@@ -2559,7 +2559,7 @@
                 "selectedRelationships": [
                     "success"
                 ],
-                "backPressureObjectThreshold": 10000,
+                "backPressureObjectThreshold": 50000,
                 "backPressureDataSizeThreshold": "1 GB",
                 "flowFileExpiration": "0 sec",
                 "prioritizers": [],
@@ -2631,7 +2631,7 @@
                 "selectedRelationships": [
                     "splits"
                 ],
-                "backPressureObjectThreshold": 10000,
+                "backPressureObjectThreshold": 50000,
                 "backPressureDataSizeThreshold": "1 GB",
                 "flowFileExpiration": "0 sec",
                 "prioritizers": [],
@@ -2703,7 +2703,7 @@
                 "selectedRelationships": [
                     "invalid"
                 ],
-                "backPressureObjectThreshold": 10000,
+                "backPressureObjectThreshold": 50000,
                 "backPressureDataSizeThreshold": "1 GB",
                 "flowFileExpiration": "0 sec",
                 "prioritizers": [],
