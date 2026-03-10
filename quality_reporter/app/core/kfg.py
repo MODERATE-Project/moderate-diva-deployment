@@ -56,7 +56,6 @@ class KafkaCommunicationGateway:
         self.context.verify_mode = ssl.CERT_REQUIRED
 
         self.consumer = self.config_consumer()
-        self.consumer.subscribe([topic])
 
     def config_consumer(self):
         """It returns the consumer configuration for the specified `topic`.
