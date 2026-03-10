@@ -12,6 +12,14 @@ services:
       KAFKA_SASL_PASSWORD: "{{ kafka_conf.kafka_sasl_psw }}"
       KAFKA_SERVER_CERTIFICATE_LOCATION: "/certs/server.crt"
       KAFKA_ENDPOINT_IDENTIFICATION: "{{ kafka_conf.kafka_endpnt_id }}"
+      KAFKA_CONSUMER_GROUP_ID: "{{ general_vars.project_name }}-quality-reporter"
+      KAFKA_AUTO_OFFSET_RESET: "latest"
+      KAFKA_POLL_TIMEOUT_MS: "250"
+      KAFKA_MAX_POLL_RECORDS: "1000"
+      KAFKA_BATCH_SIZE: "1000"
+      KAFKA_BATCH_TIMEOUT: "0.25"
+      REPORTER_HEALTHY_AFTER_SECONDS: "5"
+      REPORTER_STALE_AFTER_SECONDS: "30"
       DATABASE_PATH: sqlite:////data/report.db
     volumes:
       - "reporter_data:/data"
@@ -64,4 +72,3 @@ networks:
   services-network:
     external: true
     name: {{ general_vars.project_name }}-network
-
