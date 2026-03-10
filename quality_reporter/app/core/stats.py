@@ -616,7 +616,7 @@ class TopicStats:
                         raise RuntimeError("Failed to persist Kafka message batch")
                     if offsets_to_commit:
                         kfg_valid.commit_offsets(offsets_to_commit)
-                        logger.info(
+                        logger.debug(
                             "Persisted batch with %s Kafka messages (%s new) across %s partitions",
                             len(batch_to_flush),
                             fresh_messages,
